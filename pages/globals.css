@@ -1,0 +1,132 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.custom-input-number {
+  border-radius: 20px; /* Bordes redondeados */
+  background-color: #2d2d2d; /* Fondo oscuro */
+  color: #2d2d2d; /* Color del texto para contraste */
+  border: 2px solid #f1f1f1; /* Bordes suaves */
+  padding: 0.5rem; /* Espaciado interno */
+  width: 100%; /* Ajusta según tus necesidades */
+}
+
+.p-dropdown {
+  border: 2px solid;
+}
+
+.custom-input-number:focus {
+  border-color: #007ad9; /* Cambia el color del borde al enfocar */
+  outline: none; /* Quitar el borde por defecto */
+  box-shadow: 0 0 5px rgba(0, 122, 217, 0.5); /* Sombra suave */
+}
+
+.p-slider-horizontal{
+  width: 100%;
+  height: 2px;
+  position: relative;
+  background-color: gray;
+  top: 45%;
+}
+
+.p-slider-handle-start {
+  border: 2px solid #3B82F6;
+  background-color: #2d2d2d;
+  border-radius: 50%;
+  cursor: pointer;
+  height: 10px;
+  position: relative;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 10px;
+}
+.p-slider-handle-end {
+  border: 2px solid #3B82F6;
+  background-color: #2d2d2d;
+  border-radius: 50%;
+  cursor: pointer;
+  height: 10px;
+  position: relative;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 10px;
+}
+.p-slider-range {
+  position: relative;
+  width: 100%;
+  height:1px;
+  background-color: #3B82F6;
+  top: 45%;
+  margin-left: 10px;
+  margin-right: 10px;
+}
+.custom-input-number .p-inputtext {
+  border: none; /* Quitar el borde del input */
+  background-color: transparent; /* Fondo transparente */
+  color: #f9f9f9; /* Color del texto */
+  height: 16px;
+}
+
+.p-button {
+  border: none;
+  border-radius: 5px;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+}
+
+.custom-textarea {
+    border: 1px solid #ccc;
+    background-color: #2d2d2d;
+    border-radius: 10px;
+    /* Otros estilos personalizados */
+}
+
+.p-dropdown-panel {
+    background-color: #2d2d2d;
+    border: 1px solid #ccc;
+    border-radius: 5px
+    /* Otros estilos personalizados */
+}
+
+.custom-textarea .p-inputtextarea {
+    border: 1px solid #ccc;
+    background-color: #f9f9f9;
+    /* Otros estilos personalizados */
+}
+
+:deep(.inputnumber-input) {
+    border: none;
+    background-color: transparent;
+}
+
+.chip {
+  background-color: #DCE3F3;
+  color: #2b2b2b;
+  border-radius: 20px;
+  padding: 2px ;
+  transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
+  margin-right: 8px;
+}
+
+.chip.selected {
+  background-color: #A9B8D1;
+  color: #1a1a1a;
+}
