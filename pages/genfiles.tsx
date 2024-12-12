@@ -48,6 +48,9 @@ const ListThingProperties = () => {
     range: [number, number];
     numFiles: number;
     node: string | null;
+    
+    
+    
   }
 
   interface AtributoModificado {
@@ -61,6 +64,25 @@ const ListThingProperties = () => {
     tipo: string;
     numero_archivos: number;
     atributos_modificados: AtributoModificado[];
+    detalles_archivos?: {
+      archivo: string;
+      atributos: {
+        atributo: string;
+        propiedades_seleccionadas: string[];
+      }[];
+    }[];
+    combinaciones_atributos?: {
+      [atributo: string]: {
+        [comboStr: string]: number;
+      };
+    };
+    conteo_atributos?: {
+      atributo: string;
+      con_prop: number;
+      sin_prop: number;
+      elementos: string[];
+    }[];
+    
   }
 
   useEffect(() => {
@@ -373,21 +395,44 @@ const ListThingProperties = () => {
             />
 
           </Link>
-          <div className="bg-[#4C4C4C] text-[#f1f1f1] flex-row p-2 my-2">
+          <div className="bg-[#4C4C4C] text-[#f1f1f1] flex-row p-2 my-2 max-h-64 overflow-y-auto">
             {resumen?.map((info, index) => (
               <div key={index}>
                 <p>
-                  Se han generado para el nodo &apos;{info.nodo}&apos;: {info.numero_archivos} archivos de tipo &apos;{info.tipo}&apos;.
+                  Se han generado para el nodo &#39;{info.nodo}&#39;: {info.numero_archivos} archivos de tipo &#39;{info.tipo}&#39;.
                 </p>
                 {info.atributos_modificados.map((attr, i) => (
                   <p key={i}>
-                    Atributo &apos;{attr.atributo}&apos; con elementos {JSON.stringify(attr.elementos)} y rango {JSON.stringify(attr.rango)}.
+                    Atributo &#39;{attr.atributo}&#39; con elementos {JSON.stringify(attr.elementos)} y rango {JSON.stringify(attr.rango)}.
                   </p>
+                ))}
+                
+                {/* Aquí mostramos las combinaciones de atributos si existen */}
+                {info.combinaciones_atributos && Object.entries(info.combinaciones_atributos).map(([atributo, combos]) => (
+                  <div key={atributo} className="m-4">
+                    <p>Combinaciones de propiedades para el atributo &#39;{atributo}&#39;:</p>
+                    {Object.entries(combos).map(([comboStr, count], j) => (
+                      <p key={j}>{count} archivos con {comboStr || "cero propiedades"}</p>
+                    ))}
+                  </div>
+                ))}
+
+                <p>Detalles por archivo:</p>
+                {info.detalles_archivos?.map((archivo, j) => (
+                  <div key={j} className="m-4">
+                    <p>Archivo {archivo.archivo}:</p>
+                    {archivo.atributos.map((attr, k) => (
+                      attr.propiedades_seleccionadas.length > 0
+                        ? <p key={k}>Atributo &#39;{attr.atributo}&#39; con propiedades: {attr.propiedades_seleccionadas.join(', ')}</p>
+                        : <p key={k}>Atributo &#39;{attr.atributo}&#39; con propiedades:</p>
+                    ))}
+                  </div>
                 ))}
                 <br/>
               </div>
             ))}
           </div>
+
           
           </div>
         </footer>

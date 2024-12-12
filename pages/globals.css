@@ -19,6 +19,30 @@ body {
   background: var(--background);
   font-family: Arial, Helvetica, sans-serif;
 }
+/* globals.css o algún CSS global que cargues luego del tema por defecto */
+
+.hljs {
+  background: #2d2d2d;  /* Fondo oscuro */
+  color: #d4d4d4;       /* Color del texto por defecto */
+}
+
+.hljs-keyword,
+.hljs-literal,
+.hljs-symbol {
+  color: #c586c0;       /* Palabras clave */
+}
+
+.hljs-string {
+  color: #ce9178;       /* Cadenas de texto */
+}
+
+.hljs-number {
+  color: #b5cea8;       /* Números */
+}
+
+.hljs-comment {
+  color: #6a9955;       /* Comentarios */
+}
 
 .custom-input-number {
   border-radius: 20px; /* Bordes redondeados */

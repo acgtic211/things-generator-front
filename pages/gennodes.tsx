@@ -86,34 +86,29 @@ const GenerateRandomFiles = () => {
             <Button 
               label="Página principal" 
               icon="pi pi-home" 
-              className='bg-[#D7483E] p-3 text-sm sm:text-base px-4 sm:px-5 sm:min-w-44' 
+              className='bg-[#D7483E] p-3 text-sm sm:text-base px-4 sm:px-5 sm:min-w-44 mb-2' 
             />
           </Link>
         </div>
       </div>
 
       {/* Sección derecha: mostrar el resumen */}
-      <div className="bg-[#333333] p-4 rounded w-1/2 text-white">
+      <div className="bg-[#333333] p-4 rounded w-1/2 text-[#f1f1f1] max-h-80 overflow-y-auto">
         <h3 className="font-bold mb-4">Resumen de Archivos Generados</h3>
         {resumen ? (
           resumen.map((info, index) => (
             <div key={index} className="mb-4">
               <p>Se han generado para el nodo &apos;{info.nodo}&apos;: {info.numero_archivos} archivos de tipo &apos;{info.tipo}&apos;.</p>
-              {info.atributos_modificados.length > 0 && (
-                <p>
-                  Atributos modificados:{" "}
-                  {info.atributos_modificados.map((attr, i) => {
-                    const elementos = attr.elementos.join(", ");
-                    const rangoStr = `${attr.rango[0]}-${attr.rango[1]}`;
-                    return (
-                      <span key={i}>
-                        {attr.atributo} (Elementos: {elementos}, Rango: {rangoStr})
-                        {i < info.atributos_modificados.length - 1 ? "; " : ""}
-                      </span>
-                    );
-                  })}
-                </p>
-              )}
+              {info.atributos_modificados.map((attr, i) => {
+                const elementos = attr.elementos.join(", ");
+                return (
+                  <span key={i}>
+                    Archivo modificado con {attr.atributo} ({elementos}) 
+                    {i < info.atributos_modificados.length - 1 ? "; " : ""}
+                    <br/>
+                  </span>
+                );
+              })}
             </div>
           ))
         ) : (

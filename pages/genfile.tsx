@@ -8,10 +8,13 @@ import { Chip } from 'primereact/chip';
 import Link from 'next/link';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-
 import { Button } from 'primereact/button';
-
 import { Montserrat } from 'next/font/google'
+import Editor from 'react-simple-code-editor';
+import hljs from 'highlight.js';
+import 'highlight.js/styles/github.css';
+import 'highlight.js/styles/atom-one-dark.css';
+
 
 const montserrat = Montserrat({
   subsets: ['latin'],
@@ -19,7 +22,6 @@ const montserrat = Montserrat({
 });
 
 export default function Genfile() {
-
   const [schemes, setSchemes] = useState<string[]>([]);
   const [selectedScheme, setSelectedScheme] = useState<string | null>(null);
   const [properties, setProperties] = useState<string[]>([]);
@@ -27,6 +29,7 @@ export default function Genfile() {
   const [chips, setChips] = useState<string[]>([]);
   const [selectedChips, setSelectedChips] = useState<string[]>([]);
   const [valueRange, setRangeValue] = useState<[number, number]>([0, 0]);
+
   interface FileContent {
     [key: string]: {
       elementosSeleccionados: string[];
@@ -35,10 +38,18 @@ export default function Genfile() {
   }
 
   const [displayedFileContent, setDisplayedFileContent] = useState<FileContent | null>(null);
+  const [editableText, setEditableText] = useState('');
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
+  function highlightCode(code: string) {
+    try {
+      return hljs.highlight(code, { language: 'json' }).value;
+    } catch {
+      return code;
+    }
+  }
+
   useEffect(() => {
-    // Obtener la lista de esquemas
     axios.get('http://127.0.0.1:5000/things_types')
       .then((response) => {
         setSchemes(response.data);
@@ -50,7 +61,6 @@ export default function Genfile() {
 
   useEffect(() => {
     if (selectedScheme) {
-      // Obtener la lista de propiedades basadas en el esquema seleccionado
       axios.get(`http://127.0.0.1:5000/things_types/${selectedScheme}`)
         .then((response) => {
           setProperties(response.data);
@@ -58,7 +68,6 @@ export default function Genfile() {
         .catch((error) => {
           console.error('Error al obtener propiedades', error);
         });
-
       setRangeValue([0, 0]);
       setSelectedProperty(null);
       setSelectedChips([]);
@@ -67,22 +76,18 @@ export default function Genfile() {
 
   useEffect(() => {
     if (selectedScheme && selectedProperty) {
-      // Obtener la lista de chips basadas en el esquema y propiedad seleccionados
       axios.get(`http://127.0.0.1:5000/things_types/${selectedScheme}/${selectedProperty}`)
         .then((response) => {
           setChips(response.data);
-
         })
         .catch((error) => {
           console.error('Error al obtener esquemas', error);
         });
-
       setRangeValue([0, 0]);
     }
   }, [selectedScheme, selectedProperty]);
 
   useEffect(() => {
-    // Reiniciar los chips seleccionados y el rango del slider cuando se selecciona una nueva propiedad
     setSelectedChips([]);
     setRangeValue([0, 0]);
   }, [selectedProperty]);
@@ -92,8 +97,6 @@ export default function Genfile() {
       const newSelectedChips = prevSelectedChips.includes(chip)
         ? prevSelectedChips.filter((c) => c !== chip)
         : [...prevSelectedChips, chip];
-
-      // Actualizar el rango del slider en función del número de chips seleccionados
       setRangeValue([0, newSelectedChips.length]);
       return newSelectedChips;
     });
@@ -113,6 +116,7 @@ export default function Genfile() {
       });
 
       setDisplayedFileContent(res.data);
+      setEditableText(JSON.stringify(res.data, null, 2));
     } catch (error) {
       console.error('Error generating file:', error);
     }
@@ -126,6 +130,7 @@ export default function Genfile() {
         try {
           const content = JSON.parse(e.target?.result as string);
           setDisplayedFileContent(content);
+          setEditableText(JSON.stringify(content, null, 2));
         } catch {
           toast.error('Error al leer el archivo. Asegúrese de que es un archivo JSON válido.');
         }
@@ -140,8 +145,6 @@ export default function Genfile() {
       return;
     }
   
-    // Construir objeto de modificaciones:
-    // Asumimos que solo hay una propiedad seleccionada en este momento.
     const modifications: { [key: string]: { elementosSeleccionados: string[], rango: [number, number] } } = {};
   
     if (selectedProperty) {
@@ -163,40 +166,30 @@ export default function Genfile() {
   
       if (response.status === 200) {
         setDisplayedFileContent(response.data);
+        setEditableText(JSON.stringify(response.data, null, 2));
         toast.success('Archivo modificado con éxito');
       } else {
         toast.error(`Error al modificar el archivo: ${response.statusText}`);
       }
-    } catch (error) {
+    } catch (error){
       console.error('Error al modificar el archivo:', error);
-      toast.error('Error al modificar el archivo');
     }
   };
+
   const handleSaveFile = () => {
     if (!displayedFileContent) {
       toast.error('No hay contenido para guardar');
       return;
     }
   
-    // Convertir el contenido a cadena JSON con indentación
     const fileData = JSON.stringify(displayedFileContent, null, 2);
-  
-    // Crear un Blob a partir de la cadena JSON
     const blob = new Blob([fileData], { type: 'application/json' });
-  
-    // Crear una URL temporal para el Blob
     const url = window.URL.createObjectURL(blob);
-  
-    // Crear un enlace temporal para descargar el archivo
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', 'archivo_modificado.json'); // Nombre del archivo
+    link.setAttribute('download', 'archivo_modificado.json');
     document.body.appendChild(link);
-  
-    // Simular click en el enlace para iniciar la descarga
     link.click();
-  
-    // Limpiar el enlace
     link.remove();
   };
 
@@ -226,7 +219,8 @@ export default function Genfile() {
                 <Button label="Generar archivo" icon="pi pi-check" onClick={handleGenerateFile} className='bg-[#3B82F6] p-3 text-[#f1f1f1] w-40 mr-4' />
                 <Button label="Cargar archivo" icon="pi pi-upload" onClick={() => fileInputRef.current?.click()} className='bg-[#3B82F6] p-3 text-[#f1f1f1] w-40' />
               </div>
-              <input type="file" ref={fileInputRef} style={{ display: 'none' }} accept=".json" onChange={handleLoadFile} />
+              <label htmlFor="fileInput" className="sr-only">Cargar archivo</label>
+              <input type="file" id="fileInput" ref={fileInputRef} className="hidden" accept=".json" onChange={handleLoadFile} />
             </div>
 
             <p className='mx-2'>Elegir las propiedades a modificar</p>
@@ -263,9 +257,30 @@ export default function Genfile() {
         </main>
       </div>
       <div className="flex-1 flex flex-col justify-center items-center text-[#F1F1F1] p-8">
-        <div className="flex flex-col gap-4 bg-[#2d2d2d] p-4 rounded">
+        <div className="flex flex-col gap-4 p-4 rounded w-full">
           {displayedFileContent ? (
-            <pre>{JSON.stringify(displayedFileContent, null, 2)}</pre>
+            <Editor
+              value={editableText}
+              onValueChange={(newValue) => {
+                setEditableText(newValue);
+                try {
+                  const parsed = JSON.parse(newValue);
+                  setDisplayedFileContent(parsed);
+                } catch {
+                  // JSON no válido, no se actualiza displayedFileContent
+                }
+              }}
+              highlight={highlightCode}
+              padding={10}
+              style={{
+                fontSize: 15,
+                backgroundColor: '#2d2d2d',
+                color: '#f1f1f1',
+                border: '1px solid #f1f1f1',
+                borderRadius: '4px',
+                overflow: 'auto',
+              }}
+            />
           ) : (
             <p>No hay contenido para mostrar</p>
           )}
