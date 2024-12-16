@@ -1,21 +1,24 @@
-# frontend/Dockerfile
 FROM node:18-alpine AS builder
 
 WORKDIR /app
 COPY package*.json ./
-RUN npm install --legacy-peer-deps --frozen-lockfile
+RUN npm install --frozen-lockfile
 COPY . .
 
-RUN npm run build --legacy-peer-deps
+RUN npm run build
 
 FROM node:18-alpine AS runner
 WORKDIR /app
-COPY --from=builder /app/package.json .
+COPY --from=builder /app/package.json ./
+COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/package.json .
+COPY --from=builder /app/next.config.ts ./
+COPY --from=builder /app/tsconfig.json ./
 
-ENV HOSTNAME "0.0.0.0"
-ENTRYPOINT ["node", "server.js"]
+RUN npm install next
 
-# Next.js por defecto en el start levanta en 3000
+ENV HOSTNAME="0.0.0.0"
 EXPOSE 3000
 CMD ["npm", "run", "start"]

@@ -126,11 +126,26 @@ export default function Genfile() {
     const file = event.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onload = (e) => {
+      reader.onload = async (e) => {
         try {
           const content = JSON.parse(e.target?.result as string);
           setDisplayedFileContent(content);
           setEditableText(JSON.stringify(content, null, 2));
+          
+          // Una vez cargado el contenido, identificar el tipo:
+          const response = await axios.post('http://127.0.0.1:5000/identify_type', { schema: content }, {
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          });
+          if (response.status === 200 && response.data.type) {
+            // Ajustar el esquema seleccionado con el tipo encontrado:
+            setSelectedScheme(response.data.type);
+            toast.success(`Tipo identificado: ${response.data.type}`);
+          } else {
+            toast.error('No se pudo identificar el tipo del esquema.');
+          }
+  
         } catch {
           toast.error('Error al leer el archivo. Asegúrese de que es un archivo JSON válido.');
         }
@@ -138,6 +153,7 @@ export default function Genfile() {
       reader.readAsText(file);
     }
   };
+  
 
   const handleModify = async () => {
     if (!displayedFileContent) {

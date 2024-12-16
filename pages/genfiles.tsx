@@ -22,6 +22,7 @@ const montserrat = Montserrat({
 });
 
 
+
 const ListThingProperties = () => {
   const [schemes, setSchemes] = useState<string[]>([]);
   const [selectedScheme, setSelectedScheme] = useState<string | null>(null);
@@ -42,15 +43,13 @@ const ListThingProperties = () => {
 
 
   interface Selection {
-    scheme: string | null;
-    property: string | null;
-    chips: string[];
-    range: [number, number];
-    numFiles: number;
-    node: string | null;
-    
-    
-    
+      scheme: string | null;
+      property: string | null;
+      chips: string[];
+      range: [number, number];
+      numFiles: number;
+      node: string | null;
+      location: string | null; // Added location property
   }
 
   interface AtributoModificado {
@@ -84,7 +83,11 @@ const ListThingProperties = () => {
     }[];
     
   }
-
+  const [locations, setLocations] = useState<string[]>(["bathroom", "livingroom", "kitchen", "room", "shower room", "parent bedroom", "children bedroom", "dinning room", "watter room"]);
+  const [selectedLocation, setSelectedLocation] = useState<string | null>(null);
+  
+  console.log(setLocations);
+  
   useEffect(() => {
     // Obtener la lista de esquemas
     axios.get('http://127.0.0.1:5000/things_types')
@@ -182,7 +185,8 @@ const ListThingProperties = () => {
       chips: selectedChips,
       range: valueRange,
       numFiles: numFiles,
-      node: selectedNode
+      node: selectedNode,
+      location: selectedLocation // Nueva línea
     };
 
     setSavedSelections((prevSelections) => {
@@ -226,50 +230,50 @@ const ListThingProperties = () => {
               rango: [number, number];
             };
           };
+          location?: string; // Añadimos esta propiedad
         };
       };
     } = {};
   
-      // Asegúrate de que las filas seleccionadas existen antes de generar el diccionario
     const rowsToProcess = savedSelections || [];
-
-    // Procesar cada fila seleccionada
+  
     rowsToProcess.forEach((row) => {
-      const { node, scheme, numFiles, property, chips, range } = row;
-
+      const { node, scheme, numFiles, property, chips, range, location } = row;
+  
       if (!diccionario[node!]) {
         diccionario[node!] = {};
       }
-
+  
       if (!diccionario[node!][scheme!]) {
         diccionario[node!][scheme!] = {
           numeroArchivos: numFiles,
           atributos: {},
+          location: location || "" // Guardamos la ubicación si existe
         };
       }
-
+  
       diccionario[node!][scheme!].atributos[property!] = {
         elementosSeleccionados: chips,
         rango: range,
       };
     });
-    // Enviar el diccionario a la API usando POST
+  
     try {
       const res = await axios.post('http://127.0.0.1:5000/prepare_files/', {
-        diccionario // El diccionario con la configuración
+        diccionario
       }, {
         headers: {
           'Content-Type': 'application/json'
         }
       });
-      setResumen(res.data.resumen); // Guardar el resumen en el estado
+      setResumen(res.data.resumen);
     } catch (error) {
       console.error('Error generating files:', error);
     }
-
-    // Actualizar el estado con el diccionario generado
+  
     setGeneratedDictionary(diccionario);
   };
+
   const handleDownloadZip = () => {
     axios.get('http://127.0.0.1:5000/download_files', { responseType: 'blob' })
       .then((response) => {
@@ -310,6 +314,8 @@ const ListThingProperties = () => {
     );
   };
 
+  
+
   return (
     <div className={`flex min-h-screen ${montserrat.className}`}>
       <div className="flex-1 bg-[#2b2b2b] p-9">
@@ -332,9 +338,18 @@ const ListThingProperties = () => {
               <Dropdown value={selectedNode} onChange={(e) => setSelectedNode(e.value)} options={nodes} optionLabel="name" placeholder=""
               className="w-full md:w-14rem p-1 border border-solid rounded-full position-relative"/>      <p>Número de archivos</p>
               <InputNumber value={numFiles} onValueChange={(e) => setNumFiles(e.value || 1)} min={1} className="w-full md:w-14rem p-1 border border-solid rounded-full custom-input-number" />
-            
+
               <p>Elegir el tipo de esquema a generar</p>
               <Dropdown value={selectedScheme} onChange={(e) => setSelectedScheme(e.value)} options={schemes} optionLabel="name" optionValue="id" className="w-full md:w-14rem p-1 border border-solid rounded-full" />
+              <p>Seleccionar ubicación</p>
+              <Dropdown 
+                value={selectedLocation} 
+                onChange={(e) => setSelectedLocation(e.value)} 
+                options={locations} 
+                optionLabel="name" 
+                placeholder="Selecciona una ubicación" 
+                className="w-full md:w-14rem p-1 border border-solid rounded-full" 
+              />
               <p>Elegir las propiedades a modificar</p>
               <Dropdown value={selectedProperty} onChange={(e) => setSelectedProperty(e.value)} options={properties} optionLabel="name" className="w-full md:w-14rem p-1 border border-solid rounded-full" />      
               <div className='flex-row'>
