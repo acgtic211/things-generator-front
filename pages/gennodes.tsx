@@ -9,6 +9,8 @@ import { useRouter } from "next/router";
 import { toast } from 'react-toastify';
 import { RadioButton } from 'primereact/radiobutton';
 import Link from 'next/link';
+import { InputText } from 'primereact/inputtext';
+import 'primeicons/primeicons.css';
 
 const montserrat = Montserrat({
   subsets: ['latin'],
@@ -21,24 +23,88 @@ interface AtributoModificado {
   rango: [number, number];
 }
 
+interface ArchivoDetalle {
+  archivo: number;
+  atributos: {
+    atributo: string;
+    propiedades_seleccionadas: string[];
+  }[];
+}
+
 interface ResumenItem {
   nodo: string;
   tipo: string;
   numero_archivos: number;
   atributos_modificados: AtributoModificado[];
+  combinaciones_atributos?: {
+    [atributo: string]: {
+      [comboStr: string]: number;
+    };
+  };
+  detalles_archivos?: ArchivoDetalle[];
+}
+
+interface LocationSet {
+  location: string;
+  numFiles: number;
 }
 
 const GenerateRandomFiles = () => {
   const [numNodes, setNumNodes] = useState<number>(1);
-  const [totalFiles, setTotalFiles] = useState<number>(1);
   const [resumen, setResumen] = useState<ResumenItem[] | null>(null);
 
+  // Múltiples ubicaciones
+  const [locationSets, setLocationSets] = useState<LocationSet[]>([]);
+
+  const handleAddLocationSet = () => {
+    setLocationSets((prev) => [...prev, {location: "", numFiles: 1}]);
+  };
+
+  const handleRemoveLocationSet = (index: number) => {
+    setLocationSets((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleLocationChange = (index: number, value: string) => {
+    setLocationSets((prev) => {
+      const newSets = [...prev];
+      newSets[index].location = value;
+      return newSets;
+    });
+  };
+
+  const handleLocationNumFilesChange = (index: number, value: number) => {
+    setLocationSets((prev) => {
+      const newSets = [...prev];
+      newSets[index].numFiles = value;
+      return newSets;
+    });
+  };
+
   const handlePrepareRandomFiles = async () => {
+    // Validar que haya al menos una ubicación
+    if (locationSets.length === 0) {
+      toast.error("Debe agregar al menos una ubicación.");
+      return;
+    }
+    // Validar que todas las ubicaciones tengan nombre y numFiles > 0
+    for (const ls of locationSets) {
+      if (!ls.location.trim()) {
+        toast.error("Todas las ubicaciones deben tener un nombre.");
+        return;
+      }
+      if (ls.numFiles <= 0) {
+        toast.error("El número de archivos por ubicación debe ser mayor que 0.");
+        return;
+      }
+    }
+
     try {
-      const res = await axios.post('http://127.0.0.1:5000/prepare_random_files/', {
+      const payload = {
         num_nodos: numNodes,
-        total_archivos: totalFiles
-      }, {
+        ubicaciones: locationSets
+      };
+
+      const res = await axios.post('http://127.0.0.1:5000/prepare_random_files/', payload, {
         headers: {
           'Content-Type': 'application/json'
         }
@@ -70,16 +136,41 @@ const GenerateRandomFiles = () => {
     }
   };
 
+  // Sumar total de archivos a partir de las ubicaciones
+  const totalFiles = locationSets.reduce((sum, ls) => sum + ls.numFiles, 0);
+
   return (
     <div className="flex flex-row gap-6">
       {/* Sección izquierda: inputs y botones */}
       <div className="flex flex-col gap-4 mr-auto">
-        <p className="text-white">Número de nodos</p>
+        <p className="text-[#f1f1f1]">Número de nodos</p>
         <InputNumber value={numNodes} onValueChange={(e) => setNumNodes(e.value || 1)} min={1} className="w-full md:w-14rem p-1 border border-solid rounded-full custom-input-number" />
 
-        <p className="text-white">Número total de archivos</p>
-        <InputNumber value={totalFiles} onValueChange={(e) => setTotalFiles(e.value || 1)} min={1} className="w-full md:w-14rem p-1 border border-solid rounded-full custom-input-number" />
-        <div className="flex-col">
+        <p className="text-[#f1f1f1] mt-4">Ubicaciones:</p>
+        <div className="flex flex-col gap-2">
+          {locationSets.map((ls, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <InputText
+                value={ls.location}
+                onChange={(e) => handleLocationChange(i, e.target.value)}
+                placeholder="Nombre de la ubicación"
+                className="w-full md:w-14rem p-1 border border-solid rounded-full bg-transparent text-[#f1f1f1]"
+              />
+              <InputNumber
+                value={ls.numFiles}
+                onValueChange={(e) => handleLocationNumFilesChange(i, e.value || 1)}
+                min={1}
+                className="w-full md:w-14rem p-1 border border-solid rounded-full custom-input-number"
+              />
+              <Button icon="pi pi-trash" className="p-button-danger" onClick={() => handleRemoveLocationSet(i)} />
+            </div>
+          ))}
+          <Button label="Agregar ubicación" icon="pi pi-plus" onClick={handleAddLocationSet} className="p-button-success bg-[#43AE6A]" />
+        </div>
+
+        <p className="text-[#f1f1f1] mt-4">Total de archivos: {totalFiles}</p>
+
+        <div className="flex-col mt-4">
           <Button label="Generar Archivos Aleatorios" onClick={handlePrepareRandomFiles} className="p-button-success bg-[#3B82F6] mr-4 mb-2" />
           <Button label="Descargar ZIP" onClick={handleDownloadZip} className="p-button-success bg-[#4CAF50] mr-4 mb-2" />
           <Link href="/" passHref>
@@ -103,12 +194,35 @@ const GenerateRandomFiles = () => {
                 const elementos = attr.elementos.join(", ");
                 return (
                   <span key={i}>
-                    Archivo modificado con {attr.atributo} ({elementos}) 
-                    {i < info.atributos_modificados.length - 1 ? "; " : ""}
-                    <br/>
+                    Atributo &apos;{attr.atributo}&apos; con elementos [{elementos}] y rango [{attr.rango[0]}, {attr.rango[1]}]<br/>
                   </span>
                 );
               })}
+
+              {info.combinaciones_atributos && Object.keys(info.combinaciones_atributos).map((atributo, i) => (
+                <div key={i} className="mt-2">
+                  <p>Combinaciones para el atributo &apos;{atributo}&apos;:</p>
+                  {info.combinaciones_atributos && Object.entries(info.combinaciones_atributos[atributo]).map(([comboStr, count], j) => (
+                    <p key={j}>{count} archivos con {comboStr || "sin propiedades"}</p>
+                  ))}
+                </div>
+              ))}
+
+              {info.detalles_archivos && (
+                <div className="mt-2">
+                  <p>Detalles por archivo:</p>
+                  {info.detalles_archivos.map((archivo, k) => (
+                    <div key={k}>
+                      <p>Archivo {archivo.archivo}:</p>
+                      {archivo.atributos.map((a, m) => (
+                        <p key={m}>
+                          Atributo &apos;{a.atributo}&apos; con propiedades: {a.propiedades_seleccionadas.join(", ")}
+                        </p>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           ))
         ) : (

@@ -13,6 +13,7 @@
     "axios": "^1.7.8",
     "highlight.js": "^11.10.0",
     "next": "^15.1.0",
+    "primeicons": "^7.0.0",
     "primereact": "^10.8.4",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
