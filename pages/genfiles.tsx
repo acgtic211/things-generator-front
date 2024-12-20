@@ -17,6 +17,11 @@ import { InputText } from 'primereact/inputtext';
 
 import { Montserrat } from 'next/font/google'
 
+interface UserDoc {
+  id?: string;
+  [key: string]: unknown;
+}
+
 const montserrat = Montserrat({
   subsets: ['latin'],
   weight: ['400', '700'],
@@ -33,7 +38,7 @@ interface Selection {
   chips: string[];
   range: [number, number];
   node: string | null;
-  locationSets: LocationSet[]; // Ahora almacenamos varias ubicaciones
+  locationSets: LocationSet[]; 
 }
 
 interface AtributoModificado {
@@ -67,8 +72,11 @@ interface ResumenItem {
   }[];
 }
 
-const ListThingProperties = () => {
-  const [schemes, setSchemes] = useState<string[]>([]);
+export default function Genfiles() {
+  const [fileToUpload, setFileToUpload] = useState<File | null>(null); 
+  const [userDocs, setUserDocs] = useState<UserDoc[]>([]); 
+  const [globalSchemes, setGlobalSchemes] = useState<string[]>([]);
+  const [schemes, setSchemes] = useState<string[]>([]); // Schemes = global + nuevos del user
   const [selectedScheme, setSelectedScheme] = useState<string | null>(null);
   const [properties, setProperties] = useState<string[]>([]);
   const [selectedProperty, setSelectedProperty] = useState<string | null>(null);
@@ -81,66 +89,90 @@ const ListThingProperties = () => {
   const [selectedRows, setSelectedRows] = useState<Selection[]>([]);
   const [generatedDictionary, setGeneratedDictionary] = useState<Record<string, Record<string, { atributos: Record<string, { elementosSeleccionados: string[]; rango: [number, number] }>, ubicaciones: LocationSet[] }>> | null>(null);
   const [resumen, setResumen] = useState<ResumenItem[] | null>(null);
-  console.log(generatedDictionary)
-  // Estados para la gestión de las ubicaciones múltiples
   const [locationSets, setLocationSets] = useState<LocationSet[]>([]);
 
+  console.log('generatedDictionary:', generatedDictionary);
+
   useEffect(() => {
-    // Obtener la lista de esquemas
     axios.get('http://127.0.0.1:5000/things_types')
       .then((response) => {
-        setSchemes(response.data);
+        const types = response.data;
+        const typesId = types.map((t: { id: string }) => t.id);
+        setGlobalSchemes(typesId);
+        setSchemes(typesId); // Inicialmente schemes = globalSchemes
       })
       .catch((error) => {
         console.error('Error al obtener esquemas', error);
       });
-  }, []);
 
-  useEffect(() => {
-    if (selectedScheme) {
-      axios.get(`http://127.0.0.1:5000/things_types/${selectedScheme}`)
-        .then((response) => {
-          setProperties(response.data);
-        })
-        .catch((error) => {
-          console.error('Error al obtener propiedades', error);
-        });
-
-      setRangeValue([0, 0]);
-      setSelectedProperty(null);
-      setSelectedChips([]);
-    }
-  }, [selectedScheme]);
-
-  useEffect(() => {
-    if (selectedScheme && selectedProperty) {
-      axios.get(`http://127.0.0.1:5000/things_types/${selectedScheme}/${selectedProperty}`)
-        .then((response) => {
-          setChips(response.data);
-        })
-        .catch((error) => {
-          console.error('Error al obtener esquemas', error);
-        });
-
-      setRangeValue([0, 0]);
-    }
-  }, [selectedScheme, selectedProperty]);
-
-  useEffect(() => {
-    setSelectedChips([]);
-    setRangeValue([0, 0]);
-  }, [selectedProperty]);
-
-  useEffect(() => {
     axios
-      .get("http:///127.0.0.1:5000/nodes_list")
+      .get("http://127.0.0.1:5000/nodes_list")
       .then((response) => {
         setNodesList(response.data);
       })
       .catch((error) => {
         console.log('Error al obtener lista de nodos', error);
       });
-  } , []);
+  }, []);
+
+  // Chequea si el tipo es global
+  const isGlobalType = React.useCallback((tipo: string) => globalSchemes.includes(tipo), [globalSchemes]);
+
+  useEffect(() => {
+    if (selectedScheme) {
+      if (isGlobalType(selectedScheme)) {
+        axios.get(`http://127.0.0.1:5000/things_types/${selectedScheme}`)
+          .then((response) => {
+            setProperties(response.data);
+          })
+          .catch((error) => {
+            console.error('Error al obtener propiedades', error);
+          });
+      } else {
+        // Tipo de usuario: extraer las propiedades del doc correspondiente
+        const doc = userDocs.find(d => d.id && d.id.includes(selectedScheme));
+        if (doc) {
+          // Podemos considerar propiedades las keys que sean objetos: properties, actions, events, etc.
+          const propKeys = Object.keys(doc).filter(k => typeof doc[k] === 'object');
+          setProperties(propKeys);
+        } else {
+          setProperties([]);
+        }
+      }
+      setRangeValue([0, 0]);
+      setSelectedProperty(null);
+      setSelectedChips([]);
+    }
+  }, [selectedScheme, isGlobalType, userDocs]);
+
+  useEffect(() => {
+    if (selectedScheme && selectedProperty) {
+      if (isGlobalType(selectedScheme)) {
+        axios.get(`http://127.0.0.1:5000/things_types/${selectedScheme}/${selectedProperty}`)
+          .then((response) => {
+            setChips(response.data);
+          })
+          .catch((error) => {
+            console.error('Error al obtener esquemas', error);
+          });
+      } else {
+        // Tipo no global: extraer chips del doc
+        const doc = userDocs.find(d => d.id && d.id.includes(selectedScheme));
+        if (doc && doc[selectedProperty] && typeof doc[selectedProperty] === 'object') {
+          const chipKeys = Object.keys(doc[selectedProperty]);
+          setChips(chipKeys);
+        } else {
+          setChips([]);
+        }
+      }
+      setRangeValue([0, 0]);
+    }
+  }, [selectedScheme, selectedProperty, isGlobalType, userDocs]);
+
+  useEffect(() => {
+    setSelectedChips([]);
+    setRangeValue([0, 0]);
+  }, [selectedProperty]);
 
   const handleChipClick = (chip: string) => {
     setSelectedChips((prevSelectedChips) => {
@@ -152,7 +184,6 @@ const ListThingProperties = () => {
     });
   };
 
-  // Funciones para agregar / quitar ubicaciones
   const handleAddLocationSet = () => {
     setLocationSets((prev) => [...prev, {location: "", numFiles: 1}]);
   };
@@ -198,7 +229,6 @@ const ListThingProperties = () => {
       toast.error('Debe definir al menos una ubicación');
       return;
     }
-    // Comprobar que todas las ubicaciones tienen nombre
     for (const ls of locationSets) {
       if (!ls.location.trim()) {
         toast.error('Todas las ubicaciones deben tener un nombre.');
@@ -247,7 +277,7 @@ const ListThingProperties = () => {
     setSavedSelections((prevSelections) => prevSelections.filter((s) => s !== selection));
   };
 
-  const handleGenerateFiles = async () =>{
+  const handleGenerateFiles = async () => {
     const diccionario: {
       [node: string]: {
         [scheme: string]: {
@@ -286,7 +316,8 @@ const ListThingProperties = () => {
 
     try {
       const res = await axios.post('http://127.0.0.1:5000/prepare_files/', {
-        diccionario
+        diccionario,
+        user_docs: userDocs 
       }, {
         headers: {
           'Content-Type': 'application/json'
@@ -298,6 +329,51 @@ const ListThingProperties = () => {
     }
 
     setGeneratedDictionary(diccionario);
+  };
+
+  const identifyTypeFromDoc = (doc: { id?: string }): string | null => {
+    if (!doc || !doc.id) {
+      return null;
+    }
+    const doc_id: string = doc.id;
+    for (const scheme of schemes) {
+      if (doc_id.includes(scheme)) {
+        return scheme;
+      }
+    }
+    const parts = doc_id.split(":");
+    const potential_type = parts[parts.length - 1];
+    return potential_type;
+  };
+
+  const handleLoadFile = () => {
+    if (!fileToUpload) {
+      toast.error('Debe seleccionar un archivo para cargar.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const jsonContent = JSON.parse(event.target?.result as string);
+        setUserDocs(prev => [...prev, jsonContent]);
+        toast.success("Archivo cargado exitosamente!");
+
+        const docType = identifyTypeFromDoc(jsonContent);
+        if (docType) {
+          if (!schemes.includes(docType)) {
+            setSchemes((prev) => [...prev, docType]);
+          }
+          setSelectedScheme(docType);
+          toast.info(`Se ha identificado el tipo: ${docType} y añadido a la lista de esquemas.`);
+        } else {
+          toast.info("No se pudo identificar el tipo del archivo.");
+        }
+
+      } catch {
+        toast.error("El archivo no es un JSON válido");
+      }
+    };
+    reader.readAsText(fileToUpload);
   };
 
   const handleDownloadZip = () => {
@@ -346,25 +422,31 @@ const ListThingProperties = () => {
       <div className="flex-1 bg-[#2b2b2b] p-9">
         <div className="gap-4 space-x-2"> 
           <span className='text-4xl flex gap-6 font-bold text-[#f1f1f1]'>Generar varios archivos
-          <Image 
-            className="w-10 h-10" 
-            src="/archive.svg" 
-            alt="File icon"  
-            style={{ filter: "invert(1)" }} 
-            width={300}
-            height={300}
-          />
+            <Image 
+              className="w-10 h-10" 
+              src="/archive.svg" 
+              alt="File icon"  
+              style={{ filter: "invert(1)" }} 
+              width={300}
+              height={300}
+            />
           </span>
         </div>
-        <main className="flex-col flex  gap-6 sm:items-start">
-          <div className='flex flex-col gap-4 position-relative'>        
+        <main className="flex-col flex gap-6 sm:items-start">
+          <div className='flex flex-col gap-4 position-relative'>
             <div className="flex flex-col gap-4">
+              {/* Eliminamos user_id y upload_schema, ahora solo cargar archivo localmente */}
+              <label htmlFor="fileUpload" className="mt-4">Cargar archivo:</label>
+              <input id="fileUpload" type="file" onChange={(e) => setFileToUpload(e.target.files ? e.target.files[0] : null)} />
+              <Button label="Cargar archivo en frontend" icon="pi pi-upload" onClick={handleLoadFile} className="p-button-help bg-[#6C757D]" />
+
               <p>Seleccionar nodo destino</p>
               <Dropdown value={selectedNode} onChange={(e) => setSelectedNode(e.value)} options={nodes} optionLabel="name" placeholder=""
               className="w-full md:w-14rem p-1 border border-solid rounded-full position-relative"/>
 
               <p>Elegir el tipo de esquema a generar</p>
-              <Dropdown value={selectedScheme} onChange={(e) => setSelectedScheme(e.value)} options={schemes} optionLabel="name" optionValue="id" className="w-full md:w-14rem p-1 border border-solid rounded-full" />
+              <Dropdown value={selectedScheme} onChange={(e) => setSelectedScheme(e.value)} 
+              options={schemes} className="w-full md:w-14rem p-1 border border-solid rounded-full" />
 
               <p>Elegir las propiedades a modificar</p>
               <Dropdown value={selectedProperty} onChange={(e) => setSelectedProperty(e.value)} options={properties} optionLabel="name" className="w-full md:w-14rem p-1 border border-solid rounded-full" />
@@ -387,7 +469,6 @@ const ListThingProperties = () => {
               </div>
 
               <p>Ubicaciones:</p>
-              {/* Tabla simple de ubicaciones */}
               <div className="flex flex-col gap-2">
                 {locationSets.map((ls, i) => (
                   <div key={i} className="flex items-center gap-2">
@@ -409,7 +490,7 @@ const ListThingProperties = () => {
                 <Button label="Agregar ubicación" icon="pi pi-plus" onClick={handleAddLocationSet} className="p-button-success bg-[#43AE6A] mt-2" />
               </div>
 
-              <Button label="Guardar Selección" icon="pi pi-save"onClick={handleSaveSelection} className="p-button-success bg-[#3B82F6]" />
+              <Button label="Guardar Selección" icon="pi pi-save" onClick={handleSaveSelection} className="p-button-success bg-[#3B82F6]" />
               <ToastContainer />
             </div>
           </div> 
@@ -449,7 +530,6 @@ const ListThingProperties = () => {
                 label="Página principal" 
                 className='bg-[#D7483E] p-3 transition-colors text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44 mb-8 mr-4' 
               />
-
             </Link>
             <div className="bg-[#4C4C4C] text-[#f1f1f1] flex-row p-2 my-2 max-h-64 overflow-y-auto">
               {resumen?.map((info, index) => (
@@ -492,12 +572,4 @@ const ListThingProperties = () => {
       </div>
     </div>
   );
-};
-
-export default function Genfiles() {
-  return (
-    <div>
-      <ListThingProperties/>
-    </div>
-  );
-};
+}
