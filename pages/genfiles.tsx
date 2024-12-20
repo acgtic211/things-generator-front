@@ -73,7 +73,7 @@ interface ResumenItem {
 }
 
 export default function Genfiles() {
-  const [fileToUpload, setFileToUpload] = useState<File | null>(null); 
+  const [filesToUpload, setFilesToUpload] = useState<FileList | null>(null); 
   const [userDocs, setUserDocs] = useState<UserDoc[]>([]); 
   const [globalSchemes, setGlobalSchemes] = useState<string[]>([]);
   const [schemes, setSchemes] = useState<string[]>([]); // Schemes = global + nuevos del user
@@ -347,34 +347,41 @@ export default function Genfiles() {
   };
 
   const handleLoadFile = () => {
-    if (!fileToUpload) {
-      toast.error('Debe seleccionar un archivo para cargar.');
+    if (!filesToUpload || filesToUpload.length === 0) {
+      toast.error('Debe seleccionar al menos un archivo para cargar en el frontend.');
       return;
     }
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const jsonContent = JSON.parse(event.target?.result as string);
-        setUserDocs(prev => [...prev, jsonContent]);
-        toast.success("Archivo cargado exitosamente!");
 
-        const docType = identifyTypeFromDoc(jsonContent);
-        if (docType) {
-          if (!schemes.includes(docType)) {
-            setSchemes((prev) => [...prev, docType]);
+    const fileArray = Array.from(filesToUpload);
+
+    fileArray.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const jsonContent = JSON.parse(event.target?.result as string);
+          setUserDocs(prev => [...prev, jsonContent]);
+          toast.success(`Archivo ${file.name} cargado en el frontend exitosamente!`);
+
+          const docType = identifyTypeFromDoc(jsonContent);
+          if (docType) {
+            if (!schemes.includes(docType)) {
+              setSchemes((prev) => [...prev, docType]);
+            }
+            // No cambiamos el selectedScheme automáticamente si se suben varios
+            // Podríamos preguntar al usuario o simplemente no establecerlo.
+          } else {
+            toast.info(`No se pudo identificar el tipo del archivo ${file.name}.`);
           }
-          setSelectedScheme(docType);
-          toast.info(`Se ha identificado el tipo: ${docType} y añadido a la lista de esquemas.`);
-        } else {
-          toast.info("No se pudo identificar el tipo del archivo.");
-        }
 
-      } catch {
-        toast.error("El archivo no es un JSON válido");
-      }
-    };
-    reader.readAsText(fileToUpload);
+        } catch {
+          toast.error(`El archivo ${file.name} no es un JSON válido`);
+        }
+      };
+      reader.readAsText(file);
+    });
+
   };
+
 
   const handleDownloadZip = () => {
     axios.get('http://127.0.0.1:5000/download_files', { responseType: 'blob' })
@@ -437,7 +444,7 @@ export default function Genfiles() {
             <div className="flex flex-col gap-4">
               {/* Eliminamos user_id y upload_schema, ahora solo cargar archivo localmente */}
               <label htmlFor="fileUpload" className="mt-4">Cargar archivo:</label>
-              <input id="fileUpload" type="file" onChange={(e) => setFileToUpload(e.target.files ? e.target.files[0] : null)} />
+              <input id="fileUpload" type="file" multiple onChange={(e) => setFilesToUpload(e.target.files)} />
               <Button label="Cargar archivo en frontend" icon="pi pi-upload" onClick={handleLoadFile} className="p-button-help bg-[#6C757D]" />
 
               <p>Seleccionar nodo destino</p>
