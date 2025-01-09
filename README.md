@@ -1,5 +1,4 @@
 # Docker quick start
-```docker
 version: '3.8'
 services:
   backend:
@@ -8,6 +7,8 @@ services:
     environment:
       - FLASK_RUN_HOST=0.0.0.0
       - FLASK_RUN_PORT=5000
+    ports:
+      - "5000:5000"
 
 
   frontend:
@@ -17,10 +18,3 @@ services:
       - "3000:3000"
     environment:
       - NEXT_PUBLIC_API_URL=http://0.0.0.0:5000
-```
-
-Run the docker command
-```docker
-docker-compose up
-```
-

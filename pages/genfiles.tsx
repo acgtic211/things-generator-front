@@ -14,8 +14,15 @@ import 'react-toastify/dist/ReactToastify.css';
 import 'primeicons/primeicons.css';
 import { Button } from 'primereact/button';
 import { InputText } from 'primereact/inputtext';
-
 import { Montserrat } from 'next/font/google'
+import Editor from "react-simple-code-editor";
+import hljs from "highlight.js";
+import "highlight.js/styles/atom-one-dark.css"; // Estilo del editor
+interface FileItem {
+  name: string;
+  children?: FileItem[];
+  node?: string;
+}
 
 interface UserDoc {
   id?: string;
@@ -90,7 +97,62 @@ export default function Genfiles() {
   const [generatedDictionary, setGeneratedDictionary] = useState<Record<string, Record<string, { atributos: Record<string, { elementosSeleccionados: string[]; rango: [number, number] }>, ubicaciones: LocationSet[] }>> | null>(null);
   const [resumen, setResumen] = useState<ResumenItem[] | null>(null);
   const [locationSets, setLocationSets] = useState<LocationSet[]>([]);
+  const [previewData, setPreviewData] = useState<Record<string, unknown>[]>([]);
+  const [isPreviewVisible, setIsPreviewVisible] = useState(false); // Nuevo estado
+  const [isFileModalOpen, setIsFileModalOpen] = useState(false);
+  const [openedFileContent, setOpenedFileContent] = useState<Record<string, unknown> | null>(null);
+  const [editedFileContent, setEditedFileContent] = useState<string>(''); // Guardar el contenido editado
+  
+  // Función para resaltar sintaxis JSON
+  const highlightCode = (code: string) => {
+    try {
+      return hljs.highlight(code, { language: "json" }).value;
+    } catch {
+      return code;
+    }
+  };
 
+  const FileExplorer = ({
+    estructura,
+    onFileSelect,
+  }: {
+    estructura: FileItem[];
+    onFileSelect: (file: { name: string; node: string; type: string }) => void;
+  }) => {
+    const renderNodes = (
+      nodes: FileItem[],
+      parentNodeName: string | null = null,
+      type: string | null = null,
+      level = 0
+    ) => {
+      return nodes.map((node, index) => (
+        <div key={index} className="ml-4">
+          <details>
+            <summary
+              onClick={() => {
+                if (!node.children) {
+                  // Pasar nodo, tipo y nombre al callback
+                  onFileSelect({
+                    name: node.name, // Extraer el nombre del archivo
+                    node: parentNodeName || "root",
+                    type: type || "unknown",
+                  });
+                }
+              }}
+            >
+              {node.name}
+            </summary>
+            {node.children &&
+              renderNodes(node.children, parentNodeName || node.name, node.name, level + 1)}
+          </details>
+        </div>
+      ));
+    };
+  
+    return <div>{renderNodes(estructura)}</div>;
+  };
+  
+  
   console.log('generatedDictionary:', generatedDictionary);
 
   useEffect(() => {
@@ -183,7 +245,70 @@ export default function Genfiles() {
       return newSelectedChips;
     });
   };
+  const handleCloseModal = () => {
+    setIsFileModalOpen(false);
+    setOpenedFileContent(null);
+  };
+  const handleTogglePreview = () => {
+    if (!isPreviewVisible) {
+      handlePreviewStructure(); // Llama a handlePreviewStructure antes de mostrar la estructura
+    }
+    setIsPreviewVisible(!isPreviewVisible);
+  };
+  const handleSaveFile = async () => {
+    if (!openedFileContent) return;
+    const { node, type, name } = openedFileContent;
+    try {
+      await axios.post(
+        `http://127.0.0.1:5000/save_file/${encodeURIComponent(node as string)}/${encodeURIComponent(type as string)}/${encodeURIComponent(name as string)}`,
+        {
+          content: editedFileContent
+        },
+        {
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+      toast.success("Archivo actualizado correctamente.");
+      handleCloseModal();
+    } catch (err) {
+      console.error(err);
+      toast.error("Error al guardar el archivo");
+    }
+  };
+  
+  
 
+  const handleFileOpen = (file: { name: string; node: string; type: string }) => {
+    if (!file.name || !file.node || !file.type) {
+      toast.error("No se pudo abrir el archivo. Nodo, tipo o nombre no especificado.");
+      return;
+    }
+  
+    const encodedNode = encodeURIComponent(file.node);
+    const encodedType = encodeURIComponent(file.type);
+    const encodedName = encodeURIComponent(file.name);
+  
+    axios
+      .get(`http://127.0.0.1:5000/open_file/${encodedNode}/${encodedType}/${encodedName}`)
+      .then((response) => {
+        // Guardamos tanto el contenido como los metadatos
+        setOpenedFileContent({
+          node: file.node,
+          type: file.type,
+          name: file.name,
+          content: response.data,  // El JSON que viene del backend
+        });
+        setIsFileModalOpen(true);
+      })
+      .catch((error) => {
+        console.error("Error al abrir el archivo:", error);
+        toast.error(`Error al abrir el archivo: ${file.name}`);
+      });
+  };
+  
+  
+  
+  
   const handleAddLocationSet = () => {
     setLocationSets((prev) => [...prev, {location: "", numFiles: 1}]);
   };
@@ -291,60 +416,133 @@ export default function Genfiles() {
         };
       };
     } = {};
-
+  
     const rowsToProcess = savedSelections || [];
-
+  
     rowsToProcess.forEach((row) => {
       const { node, scheme, property, chips, range, locationSets } = row;
-
+  
       if (!diccionario[node!]) {
         diccionario[node!] = {};
       }
-
+  
       if (!diccionario[node!][scheme!]) {
         diccionario[node!][scheme!] = {
           atributos: {},
-          ubicaciones: locationSets
+          ubicaciones: locationSets.map((ls) => ({
+            location: `${ls.location}`, // Actualización para incluir el tipo en el nombre
+            numFiles: ls.numFiles,
+          })),
         };
       }
-
+  
       diccionario[node!][scheme!].atributos[property!] = {
         elementosSeleccionados: chips,
         rango: range,
       };
     });
-
+  
     try {
-      const res = await axios.post('http://127.0.0.1:5000/prepare_files/', {
-        diccionario,
-        user_docs: userDocs 
-      }, {
-        headers: {
-          'Content-Type': 'application/json'
+      const res = await axios.post(
+        'http://127.0.0.1:5000/prepare_files/',
+        {
+          diccionario,
+          user_docs: userDocs,
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+          }
         }
-      });
+      );
       setResumen(res.data.resumen);
     } catch (error) {
       console.error('Error generating files:', error);
     }
-
+  
     setGeneratedDictionary(diccionario);
   };
+  
 
   const identifyTypeFromDoc = (doc: { id?: string }): string | null => {
     if (!doc || !doc.id) {
       return null;
     }
-    const doc_id: string = doc.id;
-    for (const scheme of schemes) {
-      if (doc_id.includes(scheme)) {
-        return scheme;
-      }
+    
+    // Dividir el id por los dos puntos (:) y tomar la última parte
+    const segments = doc.id.split(':');
+    const lastSegment = segments[segments.length - 1];
+    
+    // Remover números al final del último segmento
+    const match = lastSegment.match(/^([a-zA-Z]+)(\d+)?$/);
+    const cleanedType = match ? match[1] : lastSegment;
+  
+    // Validar si el tipo limpio existe en la lista de esquemas
+    if (schemes.includes(cleanedType)) {
+      return cleanedType;
     }
-    const parts = doc_id.split(":");
-    const potential_type = parts[parts.length - 1];
-    return potential_type;
+  
+    return cleanedType; // Devolver el tipo procesado
   };
+  
+  const handlePreviewStructure = async () => {
+    const diccionario: {
+      [node: string]: {
+        [scheme: string]: {
+          atributos: {
+            [property: string]: {
+              elementosSeleccionados: string[];
+              rango: [number, number];
+            };
+          };
+          ubicaciones: LocationSet[];
+        };
+      };
+    } = {};
+  
+    savedSelections.forEach((row) => {
+      const { node, scheme, property, chips, range, locationSets } = row;
+  
+      if (!diccionario[node!]) {
+        diccionario[node!] = {};
+      }
+  
+      if (!diccionario[node!][scheme!]) {
+        diccionario[node!][scheme!] = {
+          atributos: {},
+          ubicaciones: locationSets,
+        };
+      }
+  
+      diccionario[node!][scheme!].atributos[property!] = {
+        elementosSeleccionados: chips,
+        rango: range,
+      };
+    });
+  
+    try {
+      const res = await axios.post(
+        "http://127.0.0.1:5000/preview_structure/",
+        {
+          diccionario,
+          user_docs: userDocs,
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+  
+      setPreviewData(res.data.estructura); // Actualiza los datos del árbol
+      toast.success("Previsualización generada correctamente.");
+    } catch (error) {
+      console.error("Error al generar la previsualización:", error);
+      toast.error("Hubo un error al generar la previsualización.");
+    }
+  };
+  
+  
 
   const handleLoadFile = () => {
     if (!filesToUpload || filesToUpload.length === 0) {
@@ -527,6 +725,13 @@ export default function Genfiles() {
               icon="pi pi-arrow-circle-down" 
               className='bg-[#43AE6A] p-3 transition-colors text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44 mb-8 mr-4' 
             />
+            <Button
+              label={isPreviewVisible ? "Mostrar Resumen" : "Previsualización"}
+              onClick={handleTogglePreview}
+              className="bg-[#8d8d8d] p-3 transition-colors text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44 mb-8 mr-4"
+            />
+
+
             <Link
               className=" border-black/[.08] dark:border-white/[.145] items-center justify-center "
               href="/"
@@ -539,44 +744,111 @@ export default function Genfiles() {
               />
             </Link>
             <div className="bg-[#4C4C4C] text-[#f1f1f1] flex-row p-2 my-2 max-h-64 overflow-y-auto">
-              {resumen?.map((info, index) => (
-                <div key={index}>
-                  <p>
-                    Se han generado para el nodo &#39;{info.nodo}&#39;: {info.numero_archivos} archivos de tipo &#39;{info.tipo}&#39;.
-                  </p>
-                  {info.atributos_modificados.map((attr, i) => (
-                    <p key={i}>
-                      Atributo &#39;{attr.atributo}&#39; con elementos {JSON.stringify(attr.elementos)} y rango {JSON.stringify(attr.rango)}.
+              {isPreviewVisible ? (
+                <FileExplorer estructura={previewData as unknown as FileItem[]} onFileSelect={handleFileOpen} />
+            ) : (
+                resumen?.map((info, index) => (
+                  <div key={index}>
+                    <p>
+                      Se han generado para el nodo &#39;{info.nodo}&#39;: {info.numero_archivos} archivos de tipo &#39;{info.tipo}&#39;.
                     </p>
-                  ))}
-
-                  {info.combinaciones_atributos && Object.entries(info.combinaciones_atributos).map(([atributo, combos]) => (
-                    <div key={atributo} className="m-4">
-                      <p>Combinaciones de propiedades para el atributo &#39;{atributo}&#39;:</p>
-                      {Object.entries(combos).map(([comboStr, count], j) => (
-                        <p key={j}>{count} archivos con {comboStr || "cero propiedades"}</p>
+                    {info.atributos_modificados.map((attr, i) => (
+                      <p key={i}>
+                        Atributo &#39;{attr.atributo}&#39; con elementos {JSON.stringify(attr.elementos)} y rango {JSON.stringify(attr.rango)}.
+                      </p>
+                    ))}
+                    {info.combinaciones_atributos &&
+                      Object.entries(info.combinaciones_atributos).map(([atributo, combos]) => (
+                        <div key={atributo} className="m-4">
+                          <p>Combinaciones de propiedades para el atributo &#39;{atributo}&#39;:</p>
+                          {Object.entries(combos).map(([comboStr, count], j) => (
+                            <p key={j}>{count} archivos con {comboStr || "cero propiedades"}</p>
+                          ))}
+                        </div>
                       ))}
-                    </div>
-                  ))}
+                    <p>Detalles por archivo:</p>
+                    {info.detalles_archivos?.map((archivo, j) => (
+                      <div key={j} className="m-4">
+                        <p>Archivo {archivo.archivo}:</p>
+                        {archivo.atributos.map((attr, k) => (
+                          attr.propiedades_seleccionadas.length >= 0 ? (
+                            <p key={k}>
+                              Atributo &#39;{attr.atributo}&#39; con propiedades: {attr.propiedades_seleccionadas.join(", ")}
+                            </p>
+                          ) : (
+                            <p key={k}>Atributo &#39;{attr.atributo}&#39; con propiedades:</p>
+                          )
+                        ))}
+                      </div>
+                    ))}
+                    <br />
+                  </div>
+                ))
+              )}
+               {isFileModalOpen && (
+              <div className="modal-overlay">
+                <div className="modal-content bg-[#1E1E1E] text-[#F1F1F1] p-6 rounded shadow-lg" 
+                  style={{ maxHeight: "50vh", overflowY: "auto" }}>
+                  {/* Botón para cerrar */}
+                  <button
+                    onClick={handleCloseModal}
+                    className="absolute top-2 right-2 text-[#f1f1f1] text-lg"
+                  >
+                    &times;
+                  </button>
+                  <h2 className="text-xl font-bold mb-4">Editar Archivo</h2>
 
-                  <p>Detalles por archivo:</p>
-                  {info.detalles_archivos?.map((archivo, j) => (
-                    <div key={j} className="m-4">
-                      <p>Archivo {archivo.archivo}:</p>
-                      {archivo.atributos.map((attr, k) => (
-                        attr.propiedades_seleccionadas.length > 0
-                          ? <p key={k}>Atributo &#39;{attr.atributo}&#39; con propiedades: {attr.propiedades_seleccionadas.join(', ')}</p>
-                          : <p key={k}>Atributo &#39;{attr.atributo}&#39; con propiedades:</p>
-                      ))}
-                    </div>
-                  ))}
-                  <br/>
+                  {/* Editor para editar JSON */}
+                  <Editor
+                    value={editedFileContent || JSON.stringify(openedFileContent?.content, null, 2)}
+                    onValueChange={(newValue) => setEditedFileContent(newValue)}
+                    highlight={(code) => highlightCode(code)}
+                    padding={10}
+                    style={{
+                      fontFamily: "'Fira Code', monospace",
+                      fontSize: 14,
+                      backgroundColor: "#2D2D2D",
+                      color: "#F1F1F1",
+                      border: "1px solid #444",
+                      borderRadius: "4px",
+
+                    }}
+                    
+                  />
+
+                  <div className="mt-4 flex justify-end gap-2">
+                    <button
+                      onClick={() => {
+                        try {
+                          JSON.parse(editedFileContent);
+                          handleSaveFile();
+                          toast.success("Archivo actualizado correctamente.");
+                          handleCloseModal();
+                        } catch {
+                          toast.error("El contenido no es un JSON válido.");
+                        }
+                      }}
+                      className="bg-[#43AE6A] text-[#f1f1f1] px-4 py-2 rounded"
+                    >
+                      Guardar Cambios
+                    </button>
+                    <button
+                      onClick={handleCloseModal}
+                      className="bg-[#D7483E] text-white px-4 py-2 rounded"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
                 </div>
-              ))}
+              </div>
+            )}
+
             </div>
+            
           </div>
         </footer>
       </div>
+     
     </div>
   );
 }
