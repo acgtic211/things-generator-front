@@ -126,7 +126,7 @@ export default function Genfiles() {
       level = 0
     ) => {
       return nodes.map((node, index) => (
-        <div key={index} className="ml-4">
+        <div key={index} className="">
           <details>
             <summary
               onClick={() => {
@@ -647,7 +647,7 @@ export default function Genfiles() {
 
               <p>Seleccionar nodo destino</p>
               <Dropdown value={selectedNode} onChange={(e) => setSelectedNode(e.value)} options={nodes} optionLabel="name" placeholder=""
-              className="w-full md:w-14rem p-1 border border-solid rounded-full position-relative"/>
+              className=" w-full md:w-14rem p-1 border-solid rounded-full position-relative"/>
 
               <p>Elegir el tipo de esquema a generar</p>
               <Dropdown value={selectedScheme} onChange={(e) => setSelectedScheme(e.value)} 
@@ -662,7 +662,9 @@ export default function Genfiles() {
                   <Chip 
                     key={index} 
                     label={chip} 
-                    className={`bg-[#DCE3F3] text-[#2b2b2b] font-bold rounded-full mx-1 p-1 text-xs ${selectedChips.includes(chip) ? 'bg-[#A9B8D1]' : ''}`} 
+                    className={selectedChips.includes(chip)
+                      ? "bg-[#A9B8D1] text-[#2b2b2b] font-bold rounded-full mx-1 p-1 text-xs"
+                      : "bg-[#DCE3F3] text-[#2b2b2b] font-bold rounded-full mx-1 p-1 text-xs"} 
                     onClick={() => handleChipClick(chip)} 
                   />
                 ))}

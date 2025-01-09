@@ -140,7 +140,7 @@ const GenerateRandomFiles = () => {
   const totalFiles = locationSets.reduce((sum, ls) => sum + ls.numFiles, 0);
 
   return (
-    <div className="flex flex-row gap-6">
+    <div className="flex flex-row gap-6 text-[#f1f1f1]">
       {/* Sección izquierda: inputs y botones */}
       <div className="flex flex-col gap-4 mr-auto">
         <p className="text-[#f1f1f1]">Número de nodos</p>
