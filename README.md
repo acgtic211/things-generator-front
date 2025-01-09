@@ -1,4 +1,5 @@
 # Docker quick start
+```docker
 version: '3.8'
 services:
   backend:
@@ -18,3 +19,4 @@ services:
       - "3000:3000"
     environment:
       - NEXT_PUBLIC_API_URL=http://0.0.0.0:5000
+```
