@@ -1,7 +1,7 @@
 import "./globals.css";
 import { InputNumber } from 'primereact/inputnumber';
 import { useState } from 'react';
-import { Button } from 'primereact/button';      
+import { Button } from 'primereact/button';
 import { Montserrat } from 'next/font/google';
 import Image from 'next/image';
 import axios from "axios";
@@ -49,6 +49,7 @@ interface LocationSet {
   numFiles: number;
 }
 
+/* ============== Componente GenerateRandomFiles ============== */
 const GenerateRandomFiles = () => {
   const [numNodes, setNumNodes] = useState<number>(1);
   const [resumen, setResumen] = useState<ResumenItem[] | null>(null);
@@ -57,7 +58,7 @@ const GenerateRandomFiles = () => {
   const [locationSets, setLocationSets] = useState<LocationSet[]>([]);
 
   const handleAddLocationSet = () => {
-    setLocationSets((prev) => [...prev, {location: "", numFiles: 1}]);
+    setLocationSets((prev) => [...prev, { location: "", numFiles: 1 }]);
   };
 
   const handleRemoveLocationSet = (index: number) => {
@@ -81,12 +82,10 @@ const GenerateRandomFiles = () => {
   };
 
   const handlePrepareRandomFiles = async () => {
-    // Validar que haya al menos una ubicación
     if (locationSets.length === 0) {
       toast.error("Debe agregar al menos una ubicación.");
       return;
     }
-    // Validar que todas las ubicaciones tengan nombre y numFiles > 0
     for (const ls of locationSets) {
       if (!ls.location.trim()) {
         toast.error("Todas las ubicaciones deben tener un nombre.");
@@ -136,87 +135,118 @@ const GenerateRandomFiles = () => {
     }
   };
 
-  // Sumar total de archivos a partir de las ubicaciones
   const totalFiles = locationSets.reduce((sum, ls) => sum + ls.numFiles, 0);
 
   return (
-    <div className="flex flex-row gap-6 text-[#f1f1f1]">
+    <div className="gennodes-randomContainer">
       {/* Sección izquierda: inputs y botones */}
-      <div className="flex flex-col gap-4 mr-auto">
+      <div className="gennodes-randomLeftPanel">
         <p className="text-[#f1f1f1]">Número de nodos</p>
-        <InputNumber value={numNodes} onValueChange={(e) => setNumNodes(e.value || 1)} min={1} className="w-full md:w-14rem p-1 border border-solid rounded-full custom-input-number" />
+        <InputNumber
+          value={numNodes}
+          onValueChange={(e) => setNumNodes(e.value || 1)}
+          min={1}
+          className="custom-input-number"
+        />
 
-        <p className="text-[#f1f1f1] mt-4">Ubicaciones:</p>
-        <div className="flex flex-col gap-2">
+        <p className="gennodes-textMarginTop">Ubicaciones:</p>
+        <div className="gennodes-locationsList">
           {locationSets.map((ls, i) => (
             <div key={i} className="flex items-center gap-2">
               <InputText
                 value={ls.location}
                 onChange={(e) => handleLocationChange(i, e.target.value)}
                 placeholder="Nombre de la ubicación"
-                className="w-full md:w-14rem p-1 border border-solid rounded-full bg-transparent text-[#f1f1f1]"
+                className="custom-input-text"
               />
               <InputNumber
                 value={ls.numFiles}
                 onValueChange={(e) => handleLocationNumFilesChange(i, e.value || 1)}
                 min={1}
-                className="w-full md:w-14rem p-1 border border-solid rounded-full custom-input-number"
+                className="custom-input-number"
               />
-              <Button icon="pi pi-trash" className="p-button-danger" onClick={() => handleRemoveLocationSet(i)} />
+              <Button
+                icon="pi pi-trash"
+                className="p-button-danger"
+                onClick={() => handleRemoveLocationSet(i)}
+              />
             </div>
           ))}
-          <Button label="Agregar ubicación" icon="pi pi-plus" onClick={handleAddLocationSet} className="p-button-success bg-[#43AE6A]" />
+          <Button
+            label="Agregar ubicación"
+            icon="pi pi-plus"
+            onClick={handleAddLocationSet}
+            className="gennodes-btnAddLocation"
+          />
         </div>
 
-        <p className="text-[#f1f1f1] mt-4">Total de archivos: {totalFiles}</p>
+        <p className="gennodes-textMarginTop">
+          Total de archivos: {totalFiles}
+        </p>
 
         <div className="flex-col mt-4">
-          <Button label="Generar Archivos Aleatorios" onClick={handlePrepareRandomFiles} className="p-button-success bg-[#3B82F6] mr-4 mb-2" />
-          <Button label="Descargar ZIP" onClick={handleDownloadZip} className="p-button-success bg-[#4CAF50] mr-4 mb-2" />
+          <Button
+            label="Generar Archivos"
+            onClick={handlePrepareRandomFiles}
+            className="gennodes-btnGenerateRandom"
+          />
+          <Button
+            label="Descargar ZIP"
+            onClick={handleDownloadZip}
+            className="gennodes-btnDownloadZip"
+          />
           <Link href="/" passHref>
-            <Button 
-              label="Página principal" 
-              icon="pi pi-home" 
-              className='bg-[#D7483E] p-3 text-sm sm:text-base px-4 sm:px-5 sm:min-w-44 mb-2' 
+            <Button
+              label="Página principal"
+              icon="pi pi-home"
+              className="gennodes-btnHomeRandom"
             />
           </Link>
         </div>
       </div>
 
       {/* Sección derecha: mostrar el resumen */}
-      <div className="bg-[#333333] p-4 rounded w-1/2 text-[#f1f1f1] max-h-80 overflow-y-auto">
-        <h3 className="font-bold mb-4">Resumen de Archivos Generados</h3>
+      <div className="gennodes-summaryContainer">
+        <h3 className="gennodes-summaryTitle">Resumen de Archivos Generados</h3>
         {resumen ? (
           resumen.map((info, index) => (
-            <div key={index} className="mb-4">
-              <p>Se han generado para el nodo &apos;{info.nodo}&apos;: {info.numero_archivos} archivos de tipo &apos;{info.tipo}&apos;.</p>
+            <div key={index} className="gennodes-summaryBlock">
+              <p>
+                Se han generado para el nodo &apos;{info.nodo}&apos;:{" "}
+                {info.numero_archivos} archivos de tipo &apos;{info.tipo}&apos;.
+              </p>
               {info.atributos_modificados.map((attr, i) => {
                 const elementos = attr.elementos.join(", ");
                 return (
                   <span key={i}>
-                    Atributo &apos;{attr.atributo}&apos; con elementos [{elementos}] y rango [{attr.rango[0]}, {attr.rango[1]}]<br/>
+                    Atributo &apos;{attr.atributo}&apos; con elementos [{elementos}] y rango [{attr.rango[0]}, {attr.rango[1]}]
+                    <br />
                   </span>
                 );
               })}
 
-              {info.combinaciones_atributos && Object.keys(info.combinaciones_atributos).map((atributo, i) => (
-                <div key={i} className="mt-2">
-                  <p>Combinaciones para el atributo &apos;{atributo}&apos;:</p>
-                  {info.combinaciones_atributos && Object.entries(info.combinaciones_atributos[atributo]).map(([comboStr, count], j) => (
-                    <p key={j}>{count} archivos con {comboStr || "sin propiedades"}</p>
-                  ))}
-                </div>
-              ))}
+              {info.combinaciones_atributos &&
+                Object.keys(info.combinaciones_atributos).map((atributo, i) => (
+                  <div key={i} className="gennodes-summarySpacing">
+                    <p>Combinaciones para el atributo &apos;{atributo}&apos;:</p>
+                    {info.combinaciones_atributos && Object.entries(info.combinaciones_atributos[atributo]).map(([comboStr, count], j) => (
+                      <p key={j}>
+                        {count} archivos con {comboStr || "sin propiedades"}
+                      </p>
+                    ))}
+                  </div>
+                ))}
 
               {info.detalles_archivos && (
-                <div className="mt-2">
+                <div className="gennodes-summarySpacing">
                   <p>Detalles por archivo:</p>
                   {info.detalles_archivos.map((archivo, k) => (
                     <div key={k}>
                       <p>Archivo {archivo.archivo}:</p>
                       {archivo.atributos.map((a, m) => (
                         <p key={m}>
-                          Atributo &apos;{a.atributo}&apos; con propiedades: {a.propiedades_seleccionadas.join(", ")}
+                          Atributo &apos;{a.atributo}&apos; con propiedades:{" "}
+                          {a.propiedades_seleccionadas.join(", ")}
                         </p>
                       ))}
                     </div>
@@ -233,11 +263,12 @@ const GenerateRandomFiles = () => {
   );
 };
 
+/* ============== Componente GenerateNodes ============== */
 const GenerateNodes = () => {
   const [numNodos, setNumNodos] = useState<number>(1);
   const [response, setResponse] = useState(null);
   const router = useRouter();
-  console.log(response)
+  console.log(response);
   const handleGenerateNodes = async () => {
     try {
       const res = await axios.post('http://127.0.0.1:5000/generate_nodes/', {
@@ -257,16 +288,27 @@ const GenerateNodes = () => {
   };
 
   return (
-    <div className="flex flex-col justify-center gap-4 mr-auto">
-      <p className="text-white">Elegir número de nodos a generar</p>
-      <InputNumber value={numNodos} onValueChange={(e) => setNumNodos(e.value || 1)} min={1} className="w-4 md:w-14rem p-1 border border-solid rounded-full custom-input-number" />
-      <div className="flex-col">
-        <Button label="Generar Nodos" onClick={handleGenerateNodes} className="p-button-success bg-[#3B82F6] mr-4" />
+    <div className="gennodes-generateNodesContainer">
+      <p className="gennodes-textWhite">
+        Elegir número de nodos a generar
+      </p>
+      <InputNumber
+        value={numNodos}
+        onValueChange={(e) => setNumNodos(e.value || 1)}
+        min={1}
+        className="custom-input-number"
+      />
+      <div className="flex-col mt-4">
+        <Button
+          label="Generar Nodos"
+          onClick={handleGenerateNodes}
+          className="gennodes-btnGenerateNodes"
+        />
         <Link href="/" passHref>
-          <Button 
-            label="Página principal" 
-            icon="pi pi-home" 
-            className='bg-[#D7483E] p-3 text-sm sm:text-base px-4 sm:px-5 sm:min-w-44' 
+          <Button
+            label="Página principal"
+            icon="pi pi-home"
+            className="gennodes-btnHome"
           />
         </Link>
       </div>
@@ -274,18 +316,20 @@ const GenerateNodes = () => {
   );
 };
 
+/* ============== Componente principal Gennodes (export default) ============== */
 export default function Gennodes() {
   const [selectedOption, setSelectedOption] = useState('');
 
   return (
-    <div className={`flex min-h-screen flex-col bg-[#2b2b2b] p-9 gap-6 ${montserrat.className}`}>
-      <div className="gap-4 space-x-2"> 
-        <span className='text-4xl flex gap-6 font-bold text-[#f1f1f1]'>Generar Archivos
-          <Image 
-            className="w-10 h-10" 
-            src="/archive.svg" 
-            alt="File icon"  
-            style={{ filter: "invert(1)" }} 
+    <div className={`gennodes-mainContainer ${montserrat.className}`}>
+      <div className="gennodes-titleWrapper">
+        <span className="gennodes-title">
+          Generar Archivos
+          <Image
+            className="gennodes-titleIcon"
+            src="/archive.svg"
+            alt="File icon"
+            style={{ filter: "invert(1)" }}
             width={300}
             height={300}
           />
@@ -293,14 +337,30 @@ export default function Gennodes() {
       </div>
 
       {/* Selector de opciones */}
-      <div className="flex gap-4 my-4">
+      <div className="gennodes-optionSelector">
         <div className="flex items-center">
-          <RadioButton inputId="option1" name="option" value="generateNodes" onChange={(e) => setSelectedOption(e.value)} checked={selectedOption === 'generateNodes'} />
-          <label htmlFor="option1" className="ml-2 text-white">Generar Nodos Personalizados</label>
+          <RadioButton
+            inputId="option1"
+            name="option"
+            value="generateNodes"
+            onChange={(e) => setSelectedOption(e.value)}
+            checked={selectedOption === 'generateNodes'}
+          />
+          <label htmlFor="option1" className="gennodes-optionLabel">
+            Generar Nodos Personalizados
+          </label>
         </div>
         <div className="flex items-center">
-          <RadioButton inputId="option2" name="option" value="generateRandomFiles" onChange={(e) => setSelectedOption(e.value)} checked={selectedOption === 'generateRandomFiles'} />
-          <label htmlFor="option2" className="ml-2 text-white">Generar Archivos Aleatorios</label>
+          <RadioButton
+            inputId="option2"
+            name="option"
+            value="generateRandomFiles"
+            onChange={(e) => setSelectedOption(e.value)}
+            checked={selectedOption === 'generateRandomFiles'}
+          />
+          <label htmlFor="option2" className="gennodes-optionLabel">
+            Generar Archivos Aleatorios
+          </label>
         </div>
       </div>
 
@@ -308,7 +368,9 @@ export default function Gennodes() {
       {selectedOption === 'generateRandomFiles' && <GenerateRandomFiles />}
 
       {selectedOption === '' && (
-        <p className="text-white">Por favor, selecciona una opción para continuar.</p>
+        <p className="gennodes-fallbackText">
+          Por favor, selecciona una opción para continuar.
+        </p>
       )}
     </div>
   );

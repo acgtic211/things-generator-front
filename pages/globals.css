@@ -200,7 +200,15 @@ body {
   color: #f9f9f9; /* Color del texto */
   height: 16px;
 }
-
+.custom-input-text {
+  border: 2px solid #f1f1f1;
+  background-color: #2d2d2d;
+  border-radius: 999px;
+  color: #f1f1f1;
+  font-size: 0.85rem;
+  padding: 0.5rem;
+  width: auto;
+}
 .p-button {
   border: none;
   border-radius: 5px;
@@ -211,8 +219,8 @@ body {
 .p-button-danger {
   background-color: transparent;
   color: #f1f1f1;
-  display: flex;
-  ;
+  display: flex-1;
+  
 }
 
 .custom-textarea {
@@ -306,7 +314,7 @@ body {
   color: #2d2d2d;       /* Texto para contraste */
   border: 2px solid #f1f1f1;
   padding: 0.5rem;
-  width: 100%;
+  width: auto;
 }
 
 .custom-input-number:focus {
@@ -625,7 +633,7 @@ body {
 
 /* InputText para ubicación */
 .genfiles-locationName {
-  width: 50%;
+  width: auto;
   font-family: 'Montserrat', sans-serif; /* font-sans */
   padding: 0.5rem; /* p-2 */
   border: 2px solid; /* border border-solid */
@@ -633,7 +641,6 @@ body {
   color: #2d2d2d; /* text-[#2d2d2d] */
   background-color: #f1f1f1; /* bg-[#f1f1f1] */
   padding: 0.5rem; /* Espaciado interno */
-  width: 100%; /* Ajusta según tus necesidades */
 }
 
 /* Botón "Agregar ubicación" */
@@ -827,4 +834,422 @@ body {
 /* Margin spacing dentro de la sección de resumen */
 .genfiles-blockMargin {
   margin: 1rem;
+}
+
+/* Contenedor principal de la página (fondo oscuro, padding, etc.) */
+.gennodes-mainContainer {
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+  background-color: #2b2b2b;
+  padding: 2.25rem;
+  gap: 1.5rem;
+}
+
+/* Contenedor del título */
+.gennodes-titleWrapper {
+  gap: 1rem;
+  margin-left: -0.5rem;
+  margin-right: -0.5rem;
+}
+
+/* Texto del título principal */
+.gennodes-title {
+  font-size: 2.25rem;
+  display: flex;
+  gap: 1.5rem;
+  font-weight: bold;
+  color: #f1f1f1;
+}
+
+/* Imagen del título */
+.gennodes-titleIcon {
+  width: 2.5rem;
+  height: 2.5rem;
+}
+
+/* Sección del selector de opciones (RadioButtons) */
+.gennodes-optionSelector {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+}
+
+/* Etiquetas de los RadioButtons */
+.gennodes-optionLabel {
+  margin-left: 0.5rem;
+  color: white;
+}
+
+/* Texto de fallback si no hay opción seleccionada */
+.gennodes-fallbackText {
+  color: white;
+}
+
+/* ============= Sección "Generar Nodos" ============= */
+
+/* Contenedor de la sección "GenerateNodes" */
+.gennodes-generateNodesContainer {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1rem; /* gap-4 */
+  margin-right: auto; /* mr-auto */
+}
+
+/* Texto principal de "GenerateNodes" */
+.gennodes-textWhite {
+  color: #f1f1f1; /* text-white */
+}
+
+/* InputNumber para "numNodos" */
+.gennodes-nodosInput {
+  width: 1rem; /* w-4 */
+  max-width: 14rem; /* md:w-14rem */
+  padding: 0.25rem; /* p-1 */
+  border: 1px solid; /* border border-solid */
+  border-radius: 9999px; /* rounded-full */
+  background-color: #2d2d2d; /* custom-input-number */
+}
+
+/* Botón "Generar Nodos" */
+.gennodes-btnGenerateNodes {
+  background-color: #3B82F6; /* bg-[#3B82F6] */
+  margin-right: 1rem; /* mr-4 */
+  color: #f1f1f1; /* text-[#f1f1f1] */
+  font-family: 'Montserrat', sans-serif; /* font-sans */
+  font-size: 1rem; /* text-sm */
+  padding-left: 1rem; /* px-4 */
+  padding-right: 1rem; /* px-4 */
+  padding-left: 1.25rem; /* sm:px-5 */
+  padding-right: 1.25rem; /* sm:px-5 */
+  padding: 0.75rem; /* p-3 */
+
+}
+
+/* Botón "Página principal" (en generateNodes) */
+.gennodes-btnHome {
+  background-color: #D7483E; /* bg-[#D7483E] */
+  padding: 0.75rem; /* p-3 */
+  font-size: 0.875rem; /* text-sm */
+  font-size: 1rem; /* sm:text-base */
+  color: #f1f1f1; /* text-[#f1f1f1] */
+  font-family: 'Montserrat', sans-serif; /* font-sans */
+  padding-left: 1rem; /* px-4 */
+  padding-right: 1rem; /* px-4 */
+  padding-left: 1.25rem; /* sm:px-5 */
+  padding-right: 1.25rem; /* sm:px-5 */
+}
+
+/* ============= Sección "Generar Archivos Aleatorios" ============= */
+
+/* Contenedor principal de "GenerateRandomFiles" */
+.gennodes-randomContainer {
+  display: flex;
+  flex-direction: row;
+  gap: 1.5rem; /* gap-6 */
+  color: #f1f1f1;
+}
+
+/* Columna izquierda en "GenerateRandomFiles" */
+.gennodes-randomLeftPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem; /* gap-4 */
+  margin-right: auto;
+}
+
+/* Texto con margen top */
+.gennodes-textMarginTop {
+  color: #f1f1f1;
+  margin-top: 1rem; /* mt-4 */
+}
+
+/* InputNumber para el "numNodes" */
+.gennodes-numNodesInput {
+  width: 100%;
+  max-width: 14rem; /* md:w-14rem */
+  padding: 0.25rem; /* p-1 */
+  border: 1px solid;
+  border-radius: 9999px; /* rounded-full */
+  background-color: transparent;
+  color: #f1f1f1;
+}
+
+/* Contenedor de la lista de ubicaciones */
+.gennodes-locationsList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem; /* gap-2 */
+}
+
+/* InputText para el nombre de ubicación */
+.gennodes-locationInput {
+  width: 100%;
+  max-width: 14rem; /* md:w-14rem */
+  padding: 0.25rem; /* p-1 */
+  border: 1px solid;
+  border-radius: 9999px; /* rounded-full */
+  background-color: transparent;
+  color: #f1f1f1;
+}
+
+/* Botón "Agregar ubicación" */
+.gennodes-btnAddLocation {
+  background-color: #43AE6A;
+  color:#f1f1f1;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 1rem;
+  
+}
+
+/* Botón "Generar Archivos Aleatorios" */
+.gennodes-btnGenerateRandom {
+  background-color: #3B82F6;
+  margin-right: 1rem;
+  margin-bottom: 0.5rem;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 1rem;
+  color: #f1f1f1;
+
+}
+
+/* Botón "Descargar ZIP" */
+.gennodes-btnDownloadZip {
+  background-color: #4CAF50;
+  color: #f1f1f1;
+  margin-right: 1rem;
+  margin-bottom: 0.5rem;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 1rem;
+}
+
+/* Botón "Página principal" (en random files) */
+.gennodes-btnHomeRandom {
+  background-color: #D7483E;
+  color: #f1f1f1;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+/* Contenedor (columna derecha) para el resumen */
+.gennodes-summaryContainer {
+  background-color: #333333;
+  padding: 1rem;
+  border-radius: 0.25rem;
+  width: 50%;
+  color: #f1f1f1;
+  max-height: 20rem;
+  overflow-y: auto;
+}
+
+/* Título del resumen */
+.gennodes-summaryTitle {
+  font-weight: bold;
+  margin-bottom: 1rem;
+}
+
+/* Margen inferior en bloque del resumen */
+.gennodes-summaryBlock {
+  margin-bottom: 1rem;
+}
+
+/* Margen superior en secciones del resumen */
+.gennodes-summarySpacing {
+  margin-top: 0.5rem;
+}
+
+/* --------- Clases para Genfile.tsx --------- */
+
+/* Contenedor principal (con fondo claro y texto oscuro) */
+.genfile-container {
+  display: flex;
+  min-height: 100vh;
+  background-color: #f1f1f1;
+  color: #2d2d2d;
+}
+
+/* Columna izquierda (panel) */
+.genfile-leftPanel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 2.25rem;
+}
+
+/* Sección principal dentro del panel */
+.genfile-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  align-items: flex-start;
+}
+
+/* Fila para el título (imagen + texto) */
+.genfile-titleRow {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+/* Texto principal del título */
+.genfile-title {
+  font-size: 2.25rem;
+  font-weight: bold;
+}
+
+/* Imagen que expande (flex-1) */
+.genfile-imageFlex1 {
+  flex: 1;
+}
+
+/* Clase de margin horizontal (por ejemplo, mx-2) */
+.genfile-mx2 {
+  margin-right: 0.5rem;
+  ;
+}
+
+/* Dropdown con bordes y padding */
+.genfile-dropdown {
+  width: 100%;
+  max-width: 14rem;
+  padding: 0.25rem;
+  border: 1px solid;
+  border-radius: 9999px;
+  position: relative;
+  margin-bottom: 1rem;
+}
+
+/* Botón azul de 40px de ancho y margen-right */
+.genfile-btnBlue {
+  background-color: #3B82F6;
+  padding: 0.75rem;
+  color: #f1f1f1;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 1rem;
+}
+.genfile-btn40 {
+  width: auto;
+  margin-right: 1rem;
+  padding: 0.75rem;
+  margin-bottom: 1rem;
+}
+.genfile-btnMr4 {
+  margin-right: 1rem;
+  padding: 0.75rem;
+}
+
+/* Fila horizontal */
+.genfile-flexRow {
+  flex-direction: row;
+}
+
+/* Texto con margin-x=10 (si lo usas) */
+.genfile-mx10 {
+  margin-left: 0.5rem;
+  margin-right: 1rem;
+}
+
+/* Chips por defecto */
+.genfile-chip {
+  background-color: #DCE3F3;
+  color: #2b2b2b;
+  font-weight: bold;
+  border-radius: 9999px;
+  margin: 0 0.25rem;
+  padding: 0.25rem;
+  font-size: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+/* Chips cuando están seleccionados */
+.genfile-chipSelected {
+  background-color: #A9B8D1;
+}
+
+/* Contenedor "card" estilo fila centrada */
+.genfile-cardRow {
+  display: flex;
+  flex-direction: row;
+}
+
+/* Slider con ancho personalizado */
+.genfile-sliderWidth {
+  width: 50%;
+  
+}
+
+/* Fila de botones (Modificar, Guardar, Página principal) */
+.genfile-btnRow {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: center;
+  
+}
+
+@media (min-width: 640px) {
+  .genfile-btnRow {
+    flex-direction: row;
+  }
+}
+
+/* Botón verde */
+.genfile-btnGreen {
+  background-color: #43AE6A;
+  padding: 0.75rem;
+  color: #f1f1f1;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 1rem;
+}
+
+/* Botón rojo */
+.genfile-btnRed {
+  background-color: #D7483E;
+  padding: 0.75rem;
+  color: #f1f1f1;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 1rem;
+}
+
+/* Columna derecha (panel) */
+.genfile-rightPanel {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  color: #F1F1F1;
+  padding: 2rem;
+}
+
+/* Contenedor para el editor de código */
+.genfile-codeContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem;
+  border-radius: 0.25rem;
+  width: 100%;
+}
+
+/* Editor de JSON (sintaxis y estilo) */
+.genfile-editor {
+  font-size: 15px;
+  background-color: #2d2d2d;
+  color: #f1f1f1;
+  border: 1px solid #f1f1f1;
+  border-radius: 4px;
+  overflow: auto;
+}
+
+.genfile-custom-input {
+  border: 1px solid #f1f1f1;
+  font-family: 'Montserrat', sans-serif;
+  border-radius: 10px;
+  padding: 0.5rem;
+  width: 100%;
 }
