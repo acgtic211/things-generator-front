@@ -338,7 +338,7 @@ export default function Gennodes() {
 
       {/* Selector de opciones */}
       <div className="gennodes-optionSelector">
-        <div className="flex items-center">
+        <div className="flex">
           <RadioButton
             inputId="option1"
             name="option"
