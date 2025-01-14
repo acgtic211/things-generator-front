@@ -1,5 +1,5 @@
 import Image from "next/image";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import axios from "axios";
 import "./globals.css"; // Importa los estilos globales con nuestras clases custom
 import { Dropdown } from 'primereact/dropdown';
@@ -19,27 +19,10 @@ import Editor from "react-simple-code-editor";
 import hljs from "highlight.js";
 import "highlight.js/styles/atom-one-dark.css"; // Estilo del editor
 
-interface FileItem {
-  name: string;
-  children?: FileItem[];
-  node?: string;
-}
-
-interface UserDoc {
-  id?: string;
-  [key: string]: unknown;
-}
-
-const montserrat = Montserrat({
-  subsets: ['latin'],
-  weight: ['400', '700'],
-});
-
 interface LocationSet {
   location: string;
   numFiles: number;
 }
-
 interface Selection {
   scheme: string | null;
   property: string | null;
@@ -48,13 +31,15 @@ interface Selection {
   node: string | null;
   locationSets: LocationSet[];
 }
-
+interface UserDoc {
+  id?: string;
+  [key: string]: unknown;
+}
 interface AtributoModificado {
   atributo: string;
   elementos: string[];
   rango: [number, number];
 }
-
 interface ResumenItem {
   nodo: string;
   tipo: string;
@@ -79,12 +64,32 @@ interface ResumenItem {
     elementos: string[];
   }[];
 }
+interface FileItem {
+  name: string;
+  children?: FileItem[];
+  node?: string;
+}
+
+// Estructura que usaremos al agrupar (unificar) varias Selection en una sola.
+interface GroupedSelection {
+  node: string;
+  scheme: string;
+  properties: string[]; // Ej.: ["properties", "actions"]
+  chips: string[];      // Union de todos los chips
+  ranges: string[];     // Ej.: ["0 - 3", "0 - 4"]
+  locationSets: LocationSet[]; // Unión (o fusión) de las ubicaciones
+}
+
+const montserrat = Montserrat({
+  subsets: ['latin'],
+  weight: ['400', '700'],
+});
 
 export default function Genfiles() {
   const [filesToUpload, setFilesToUpload] = useState<FileList | null>(null);
   const [userDocs, setUserDocs] = useState<UserDoc[]>([]);
   const [globalSchemes, setGlobalSchemes] = useState<string[]>([]);
-  const [schemes, setSchemes] = useState<string[]>([]); // Schemes = global + nuevos del user
+  const [schemes, setSchemes] = useState<string[]>([]);
   const [selectedScheme, setSelectedScheme] = useState<string | null>(null);
   const [properties, setProperties] = useState<string[]>([]);
   const [selectedProperty, setSelectedProperty] = useState<string | null>(null);
@@ -94,25 +99,7 @@ export default function Genfiles() {
   const [savedSelections, setSavedSelections] = useState<Selection[]>([]);
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const [nodes, setNodesList] = useState<string[]>([]);
-  const [selectedRows, setSelectedRows] = useState<Selection[]>([]);
-  const [generatedDictionary, setGeneratedDictionary] = useState<
-    Record<
-      string,
-      Record<
-        string,
-        {
-          atributos: Record<
-            string,
-            {
-              elementosSeleccionados: string[];
-              rango: [number, number];
-            }
-          >;
-          ubicaciones: LocationSet[];
-        }
-      >
-    > | null
-  >(null);
+  const [generatedDictionary, setGeneratedDictionary] = useState<Record<string, Record<string, { atributos: Record<string, { elementosSeleccionados: string[]; rango: [number, number]; }>; ubicaciones: LocationSet[]; }>> | null>(null);
   const [resumen, setResumen] = useState<ResumenItem[] | null>(null);
   const [locationSets, setLocationSets] = useState<LocationSet[]>([]);
   const [previewData, setPreviewData] = useState<Record<string, unknown>[]>([]);
@@ -121,55 +108,10 @@ export default function Genfiles() {
   const [openedFileContent, setOpenedFileContent] = useState<Record<string, unknown> | null>(null);
   const [editedFileContent, setEditedFileContent] = useState<string>("");
 
-  // Función para resaltar sintaxis JSON
-  const highlightCode = (code: string) => {
-    try {
-      return hljs.highlight(code, { language: "json" }).value;
-    } catch {
-      return code;
-    }
-  };
-
-  const FileExplorer = ({
-    estructura,
-    onFileSelect,
-  }: {
-    estructura: FileItem[];
-    onFileSelect: (file: { name: string; node: string; type: string }) => void;
-  }) => {
-    const renderNodes = (
-      nodes: FileItem[],
-      parentNodeName: string | null = null,
-      type: string | null = null
-    ) => {
-      return nodes.map((node, index) => (
-        <div key={index}>
-          <details>
-            <summary
-              onClick={() => {
-                if (!node.children) {
-                  onFileSelect({
-                    name: node.name,
-                    node: parentNodeName || "root",
-                    type: type || "unknown",
-                  });
-                }
-              }}
-            >
-              {node.name}
-            </summary>
-            {node.children &&
-              renderNodes(node.children, parentNodeName || node.name, node.name)}
-          </details>
-        </div>
-      ));
-    };
-
-    return <div>{renderNodes(estructura)}</div>;
-  };
-
-  console.log("generatedDictionary:", generatedDictionary);
-
+  console.log(generatedDictionary);
+  // -------------------------------------------
+  //  useEffects y funciones auxiliares
+  // -------------------------------------------
   useEffect(() => {
     axios
       .get("http://127.0.0.1:5000/things_types")
@@ -193,7 +135,7 @@ export default function Genfiles() {
       });
   }, []);
 
-  const isGlobalType = React.useCallback(
+  const isGlobalType = useCallback(
     (tipo: string) => globalSchemes.includes(tipo),
     [globalSchemes]
   );
@@ -257,6 +199,9 @@ export default function Genfiles() {
     setRangeValue([0, 0]);
   }, [selectedProperty]);
 
+  // -------------------------------------------
+  //  Handlers
+  // -------------------------------------------
   const handleChipClick = (chip: string) => {
     setSelectedChips((prevSelectedChips) => {
       const newSelectedChips = prevSelectedChips.includes(chip)
@@ -265,298 +210,6 @@ export default function Genfiles() {
       setRangeValue([0, newSelectedChips.length]);
       return newSelectedChips;
     });
-  };
-
-  const handleCloseModal = () => {
-    setIsFileModalOpen(false);
-    setOpenedFileContent(null);
-  };
-
-  const handleTogglePreview = () => {
-    if (!isPreviewVisible) {
-      handlePreviewStructure();
-    }
-    setIsPreviewVisible(!isPreviewVisible);
-  };
-
-  const handleSaveFile = async () => {
-    if (!openedFileContent) return;
-    const { node, type, name } = openedFileContent;
-    try {
-      await axios.post(
-        `http://127.0.0.1:5000/save_file/${encodeURIComponent(node as string)}/${encodeURIComponent(
-          type as string
-        )}/${encodeURIComponent(name as string)}`,
-        {
-          content: editedFileContent,
-        },
-        {
-          headers: { "Content-Type": "application/json" },
-        }
-      );
-      toast.success("Archivo actualizado correctamente.");
-      handleCloseModal();
-    } catch (err) {
-      console.error(err);
-      toast.error("Error al guardar el archivo");
-    }
-  };
-
-  const handleFileOpen = (file: { name: string; node: string; type: string }) => {
-    if (!file.name || !file.node || !file.type) {
-      toast.error("No se pudo abrir el archivo. Nodo, tipo o nombre no especificado.");
-      return;
-    }
-
-    const encodedNode = encodeURIComponent(file.node);
-    const encodedType = encodeURIComponent(file.type);
-    const encodedName = encodeURIComponent(file.name);
-
-    axios
-      .get(`http://127.0.0.1:5000/open_file/${encodedNode}/${encodedType}/${encodedName}`)
-      .then((response) => {
-        setOpenedFileContent({
-          node: file.node,
-          type: file.type,
-          name: file.name,
-          content: response.data,
-        });
-        setIsFileModalOpen(true);
-      })
-      .catch((error) => {
-        console.error("Error al abrir el archivo:", error);
-        toast.error(`Error al abrir el archivo: ${file.name}`);
-      });
-  };
-
-  const handleAddLocationSet = () => {
-    setLocationSets((prev) => [...prev, { location: "", numFiles: 1 }]);
-  };
-
-  const handleRemoveLocationSet = (index: number) => {
-    setLocationSets((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const handleLocationChange = (index: number, value: string) => {
-    setLocationSets((prev) => {
-      const newSets = [...prev];
-      newSets[index].location = value;
-      return newSets;
-    });
-  };
-
-  const handleLocationNumFilesChange = (index: number, value: number) => {
-    setLocationSets((prev) => {
-      const newSets = [...prev];
-      newSets[index].numFiles = value;
-      return newSets;
-    });
-  };
-
-  const handleSaveSelection = () => {
-    if (!selectedNode) {
-      toast.error('El campo "Nodo" debe tener un valor');
-      return;
-    }
-    if (!selectedScheme) {
-      toast.error('El campo "Tipo" debe tener un valor');
-      return;
-    }
-    if (!selectedProperty) {
-      toast.error('El campo "Atributos seleccionados" debe tener un valor');
-      return;
-    }
-    if (selectedChips.length === 0) {
-      toast.error("Debe seleccionar al menos un chip");
-      return;
-    }
-    if (locationSets.length === 0) {
-      toast.error("Debe definir al menos una ubicación");
-      return;
-    }
-    for (const ls of locationSets) {
-      if (!ls.location.trim()) {
-        toast.error("Todas las ubicaciones deben tener un nombre.");
-        return;
-      }
-      if (ls.numFiles <= 0) {
-        toast.error("El número de archivos por ubicación debe ser mayor que 0.");
-        return;
-      }
-    }
-
-    const newSelection: Selection = {
-      scheme: selectedScheme,
-      property: selectedProperty,
-      chips: selectedChips,
-      range: valueRange,
-      node: selectedNode,
-      locationSets: locationSets,
-    };
-
-    setSavedSelections((prevSelections) => {
-      const existingIndex = prevSelections.findIndex(
-        (selection) =>
-          selection.scheme === selectedScheme &&
-          selection.property === selectedProperty &&
-          selection.node === selectedNode
-      );
-
-      if (existingIndex !== -1) {
-        const updatedSelections = [...prevSelections];
-        updatedSelections[existingIndex] = newSelection;
-        return updatedSelections;
-      } else {
-        return [...prevSelections, newSelection];
-      }
-    });
-  };
-
-  const handleEditSelection = (selection: Selection) => {
-    setSelectedScheme(selection.scheme);
-    setSelectedProperty(selection.property);
-    setSelectedChips(selection.chips);
-    setRangeValue(selection.range);
-    setSelectedNode(selection.node);
-    setLocationSets(selection.locationSets);
-  };
-
-  const handleDeleteSelection = (selection: Selection) => {
-    setSavedSelections((prevSelections) => prevSelections.filter((s) => s !== selection));
-  };
-
-  const handleGenerateFiles = async () => {
-    const diccionario: {
-      [node: string]: {
-        [scheme: string]: {
-          atributos: {
-            [property: string]: {
-              elementosSeleccionados: string[];
-              rango: [number, number];
-            };
-          };
-          ubicaciones: LocationSet[];
-        };
-      };
-    } = {};
-
-    const rowsToProcess = savedSelections || [];
-
-    rowsToProcess.forEach((row) => {
-      const { node, scheme, property, chips, range, locationSets } = row;
-
-      if (!diccionario[node!]) {
-        diccionario[node!] = {};
-      }
-
-      if (!diccionario[node!][scheme!]) {
-        diccionario[node!][scheme!] = {
-          atributos: {},
-          ubicaciones: locationSets.map((ls) => ({
-            location: `${ls.location}`,
-            numFiles: ls.numFiles,
-          })),
-        };
-      }
-
-      diccionario[node!][scheme!].atributos[property!] = {
-        elementosSeleccionados: chips,
-        rango: range,
-      };
-    });
-
-    try {
-      const res = await axios.post(
-        "http://127.0.0.1:5000/prepare_files/",
-        {
-          diccionario,
-          user_docs: userDocs,
-        },
-        {
-          headers: {
-            "Content-Type": "application/json",
-          }
-        }
-      );
-      setResumen(res.data.resumen);
-    } catch (error) {
-      console.error("Error generating files:", error);
-    }
-
-    setGeneratedDictionary(diccionario);
-  };
-
-  const identifyTypeFromDoc = (doc: { id?: string }): string | null => {
-    if (!doc || !doc.id) {
-      return null;
-    }
-
-    const segments = doc.id.split(":");
-    const lastSegment = segments[segments.length - 1];
-    const match = lastSegment.match(/^([a-zA-Z]+)(\d+)?$/);
-    const cleanedType = match ? match[1] : lastSegment;
-
-    if (schemes.includes(cleanedType)) {
-      return cleanedType;
-    }
-    return cleanedType;
-  };
-
-  const handlePreviewStructure = async () => {
-    const diccionario: {
-      [node: string]: {
-        [scheme: string]: {
-          atributos: {
-            [property: string]: {
-              elementosSeleccionados: string[];
-              rango: [number, number];
-            };
-          };
-          ubicaciones: LocationSet[];
-        };
-      };
-    } = {};
-
-    savedSelections.forEach((row) => {
-      const { node, scheme, property, chips, range, locationSets } = row;
-
-      if (!diccionario[node!]) {
-        diccionario[node!] = {};
-      }
-
-      if (!diccionario[node!][scheme!]) {
-        diccionario[node!][scheme!] = {
-          atributos: {},
-          ubicaciones: locationSets,
-        };
-      }
-
-      diccionario[node!][scheme!].atributos[property!] = {
-        elementosSeleccionados: chips,
-        rango: range,
-      };
-    });
-
-    try {
-      const res = await axios.post(
-        "http://127.0.0.1:5000/preview_structure/",
-        {
-          diccionario,
-          user_docs: userDocs,
-        },
-        {
-          headers: {
-            "Content-Type": "application/json",
-          }
-        }
-      );
-
-      setPreviewData(res.data.estructura);
-      toast.success("Previsualización generada correctamente.");
-    } catch (error) {
-      console.error("Error al generar la previsualización:", error);
-      toast.error("Hubo un error al generar la previsualización.");
-    }
   };
 
   const handleLoadFile = () => {
@@ -590,6 +243,268 @@ export default function Genfiles() {
     });
   };
 
+  const identifyTypeFromDoc = (doc: { id?: string }): string | null => {
+    if (!doc || !doc.id) {
+      return null;
+    }
+    const segments = doc.id.split(":");
+    const lastSegment = segments[segments.length - 1];
+    const match = lastSegment.match(/^([a-zA-Z]+)(\d+)?$/);
+    const cleanedType = match ? match[1] : lastSegment;
+    if (schemes.includes(cleanedType)) {
+      return cleanedType;
+    }
+    return cleanedType;
+  };
+
+  // -------------------------------------------
+  //  Ubicaciones
+  // -------------------------------------------
+  const handleAddLocationSet = () => {
+    setLocationSets((prev) => [...prev, { location: "", numFiles: 1 }]);
+  };
+
+  const handleRemoveLocationSet = (index: number) => {
+    setLocationSets((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleLocationChange = (index: number, value: string) => {
+    setLocationSets((prev) => {
+      const newSets = [...prev];
+      newSets[index].location = value;
+      return newSets;
+    });
+  };
+
+  const handleLocationNumFilesChange = (index: number, value: number) => {
+    setLocationSets((prev) => {
+      const newSets = [...prev];
+      newSets[index].numFiles = value;
+      return newSets;
+    });
+  };
+
+  // -------------------------------------------
+  //  Guardar selección
+  // -------------------------------------------
+  const handleSaveSelection = () => {
+    if (!selectedNode) {
+      toast.error('El campo "Nodo" debe tener un valor');
+      return;
+    }
+    if (!selectedScheme) {
+      toast.error('El campo "Tipo" debe tener un valor');
+      return;
+    }
+    if (!selectedProperty) {
+      toast.error('El campo "Atributos seleccionados" debe tener un valor');
+      return;
+    }
+    if (selectedChips.length === 0) {
+      toast.error("Debe seleccionar al menos un chip");
+      return;
+    }
+    if (locationSets.length === 0) {
+      toast.error("Debe definir al menos una ubicación");
+      return;
+    }
+    for (const ls of locationSets) {
+      if (!ls.location.trim()) {
+        toast.error("Todas las ubicaciones deben tener un nombre.");
+        return;
+      }
+      if (ls.numFiles <= 0) {
+        toast.error("El número de archivos por ubicación debe ser mayor que 0.");
+        return;
+      }
+    }
+    const clonedLocationSets = locationSets.map((loc) => ({ ...loc }));
+
+    const newSelection: Selection = {
+      scheme: selectedScheme,
+      property: selectedProperty,
+      chips: selectedChips,
+      range: valueRange,
+      node: selectedNode,
+      locationSets: clonedLocationSets,
+    };
+
+    setSavedSelections((prevSelections) => {
+      const existingIndex = prevSelections.findIndex(
+        (sel) =>
+          sel.scheme === selectedScheme &&
+          sel.property === selectedProperty &&
+          sel.node === selectedNode
+      );
+      // Si ya había una selección con la misma combinación (node, scheme, property),
+      // la actualizamos, si no, la agregamos.
+      if (existingIndex !== -1) {
+        const updatedSelections = [...prevSelections];
+        updatedSelections[existingIndex] = newSelection;
+        return updatedSelections;
+      } else {
+        return [...prevSelections, newSelection];
+      }
+    });
+  };
+
+  const handleEditSelection = (selection: Selection) => {
+    setSelectedScheme(selection.scheme);
+    setSelectedProperty(selection.property);
+    setSelectedChips(selection.chips);
+    setRangeValue(selection.range);
+    setSelectedNode(selection.node);
+    setLocationSets(selection.locationSets);
+    // Establecer el valor máximo del rango basado en el número de chips en properties[0]
+  };
+
+  // rowData es de tipo GroupedSelection
+const handleDeleteSelection = (rowData: GroupedSelection) => {
+  // Filtra todas las "Selection" que NO tengan el mismo node y scheme
+  setSavedSelections((prevSelections) =>
+    prevSelections.filter(
+      (sel) => sel.node !== rowData.node || sel.scheme !== rowData.scheme
+    )
+  );
+  toast.success("Selección eliminada.");
+};
+
+  
+
+  // -------------------------------------------
+  //  Agrupar en una sola fila por (node, scheme)
+  // -------------------------------------------
+  const getGroupedSelections = useCallback((): GroupedSelection[] => {
+    /*
+      1) Recorremos savedSelections
+      2) Creamos un Map donde la key = `${node}-${scheme}`
+      3) Agrupamos en un objeto con:
+         properties: string[]
+         chips: string[]
+         ranges: string[]  (en formato "0 - 3")
+         locationSets: union/fusión
+    */
+    const groupingMap = new Map<string, GroupedSelection>();
+
+    savedSelections.forEach((sel) => {
+      const key = `${sel.node}---${sel.scheme}`;
+      const rangeStr = `${sel.range[0]} - ${sel.range[1]}`;
+
+      // Agregamos si no existe
+      if (!groupingMap.has(key)) {
+        groupingMap.set(key, {
+          node: sel.node || "",
+          scheme: sel.scheme || "",
+          properties: sel.property ? [sel.property] : [],
+          chips: [...sel.chips],
+          ranges: [rangeStr],
+          locationSets: sel.locationSets.map((l) => ({ ...l })), // copiar
+        });
+      } else {
+        const group = groupingMap.get(key)!;
+        // properties
+        if (sel.property && !group.properties.includes(sel.property)) {
+          group.properties.push(sel.property);
+        }
+        // chips
+        group.chips.push(...sel.chips);
+        // ranges
+        group.ranges.push(rangeStr);
+        // locationSets (fusionar)
+        sel.locationSets.forEach((loc) => {
+          const existing = group.locationSets.find(
+            (gLoc) => gLoc.location === loc.location
+          );
+          if (existing) {
+            //actualizar
+          } else {
+            group.locationSets.push({ ...loc });
+          }
+        });
+      }
+    });
+
+    // Convertimos a array y limpiamos duplicados
+    const finalArray: GroupedSelection[] = [];
+    groupingMap.forEach((value) => {
+      // Eliminamos duplicados en chips
+      const chipsUnique = Array.from(new Set(value.chips));
+      // Podrías también quitar duplicados en properties
+      const propsUnique = Array.from(new Set(value.properties));
+      // Ranges normalmente no se deduplican, porque cada “fila” es un rango distinto
+      // pero si quisieras, podrías hacerlo.
+
+      finalArray.push({
+        ...value,
+        properties: propsUnique,
+        chips: chipsUnique,
+      });
+    });
+
+    return finalArray;
+  }, [savedSelections]);
+
+  // Llamamos a la función. Este array lo usaremos en <DataTable/>
+  const groupedSelections = getGroupedSelections();
+
+  // -------------------------------------------
+  //  Generar / Previsualizar / Descargar
+  // -------------------------------------------
+  const handleGenerateFiles = async () => {
+    const diccionario: {
+      [node: string]: {
+        [scheme: string]: {
+          atributos: {
+            [property: string]: {
+              elementosSeleccionados: string[];
+              rango: [number, number];
+            };
+          };
+          ubicaciones: LocationSet[];
+        };
+      };
+    } = {};
+
+    (savedSelections || []).forEach((row) => {
+      const { node, scheme, property, chips, range, locationSets } = row;
+      if (!diccionario[node!]) {
+        diccionario[node!] = {};
+      }
+      if (!diccionario[node!][scheme!]) {
+        diccionario[node!][scheme!] = {
+          atributos: {},
+          ubicaciones: locationSets.map((ls) => ({
+            location: ls.location,
+            numFiles: ls.numFiles,
+          })),
+        };
+      }
+      diccionario[node!][scheme!].atributos[property!] = {
+        elementosSeleccionados: chips,
+        rango: range,
+      };
+    });
+
+    try {
+      const res = await axios.post(
+        "http://127.0.0.1:5000/prepare_files/",
+        {
+          diccionario,
+          user_docs: userDocs,
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+          }
+        }
+      );
+      setResumen(res.data.resumen);
+    } catch (error) {
+      console.error("Error generating files:", error);
+    }
+    setGeneratedDictionary(diccionario);
+  };
+
   const handleDownloadZip = () => {
     axios
       .get("http://127.0.0.1:5000/download_files", { responseType: "blob" })
@@ -607,26 +522,204 @@ export default function Genfiles() {
       });
   };
 
-  const actionBodyTemplate = (rowData: Selection) => {
+  const handlePreviewStructure = async () => {
+    const diccionario: {
+      [node: string]: {
+        [scheme: string]: {
+          atributos: {
+            [property: string]: {
+              elementosSeleccionados: string[];
+              rango: [number, number];
+            };
+          };
+          ubicaciones: LocationSet[];
+        };
+      };
+    } = {};
+
+    savedSelections.forEach((row) => {
+      const { node, scheme, property, chips, range, locationSets } = row;
+      if (!diccionario[node!]) {
+        diccionario[node!] = {};
+      }
+      if (!diccionario[node!][scheme!]) {
+        diccionario[node!][scheme!] = {
+          atributos: {},
+          ubicaciones: locationSets,
+        };
+      }
+      diccionario[node!][scheme!].atributos[property!] = {
+        elementosSeleccionados: chips,
+        rango: range,
+      };
+    });
+
+    try {
+      const res = await axios.post(
+        "http://127.0.0.1:5000/preview_structure/",
+        {
+          diccionario,
+          user_docs: userDocs,
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+          }
+        }
+      );
+      setPreviewData(res.data.estructura);
+      toast.success("Previsualización generada correctamente.");
+    } catch (error) {
+      console.error("Error al generar la previsualización:", error);
+      toast.error("Hubo un error al generar la previsualización.");
+    }
+  };
+
+  const handleTogglePreview = () => {
+    if (!isPreviewVisible) {
+      handlePreviewStructure();
+    }
+    setIsPreviewVisible(!isPreviewVisible);
+  };
+
+  // -------------------------------------------
+  //  Modal de edición de archivo
+  // -------------------------------------------
+  const highlightCode = (code: string) => {
+    try {
+      return hljs.highlight(code, { language: "json" }).value;
+    } catch {
+      return code;
+    }
+  };
+
+  const handleFileOpen = (file: { name: string; node: string; type: string }) => {
+    if (!file.name || !file.node || !file.type) {
+      toast.error("No se pudo abrir el archivo. Nodo, tipo o nombre no especificado.");
+      return;
+    }
+    const encodedNode = encodeURIComponent(file.node);
+    const encodedType = encodeURIComponent(file.type);
+    const encodedName = encodeURIComponent(file.name);
+
+    axios
+      .get(`http://127.0.0.1:5000/open_file/${encodedNode}/${encodedType}/${encodedName}`)
+      .then((response) => {
+        setOpenedFileContent({
+          node: file.node,
+          type: file.type,
+          name: file.name,
+          content: response.data,
+        });
+        setIsFileModalOpen(true);
+      })
+      .catch((error) => {
+        console.error("Error al abrir el archivo:", error);
+        toast.error(`Error al abrir el archivo: ${file.name}`);
+      });
+  };
+
+  const handleCloseModal = () => {
+    setIsFileModalOpen(false);
+    setOpenedFileContent(null);
+  };
+
+  const handleSaveFile = async () => {
+    if (!openedFileContent) return;
+    const { node, type, name } = openedFileContent;
+    try {
+      await axios.post(
+        `http://127.0.0.1:5000/save_file/${encodeURIComponent(node as string)}/${encodeURIComponent(
+          type as string
+        )}/${encodeURIComponent(name as string)}`,
+        {
+          content: editedFileContent,
+        },
+        {
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+      toast.success("Archivo actualizado correctamente.");
+      handleCloseModal();
+    } catch (err) {
+      console.error(err);
+      toast.error("Error al guardar el archivo");
+    }
+  };
+
+  // -------------------------------------------
+  //  Render
+  // -------------------------------------------
+  // Para la “vista de exploración” de archivos en la previsualización
+  const FileExplorer = ({
+    estructura,
+    onFileSelect,
+  }: {
+    estructura: FileItem[];
+    onFileSelect: (file: { name: string; node: string; type: string }) => void;
+  }) => {
+    const renderNodes = (
+      nodes: FileItem[],
+      parentNodeName: string | null = null,
+      type: string | null = null
+    ) => {
+      return nodes.map((node, index) => (
+        <div key={index}>
+          <details>
+            <summary
+              onClick={() => {
+                if (!node.children) {
+                  onFileSelect({
+                    name: node.name,
+                    node: parentNodeName || "root",
+                    type: type || "unknown",
+                  });
+                }
+              }}
+            >
+              {node.name}
+            </summary>
+            {node.children &&
+              renderNodes(node.children, parentNodeName || node.name, node.name)}
+          </details>
+        </div>
+      ));
+    };
+    return <div>{renderNodes(estructura)}</div>;
+  };
+
+  // Si quisieras acciones de editar/borrar en la fila unificada:
+  const groupedActionBodyTemplate = (rowData: GroupedSelection) => {
     return (
-      <div className="flex gap-2 justify-center">
-        <Image
-          src="/edit.svg"
-          alt="Edit"
-          width={20}
-          height={20}
-          className="cursor-pointer"
-          style={{ filter: "invert(1)", marginRight: "0.5rem", marginLeft: "8px", textAlign: "center" }}
-          onClick={() => handleEditSelection(rowData)}
+      <div>
+        {/* Ejemplo minimal (no tenemos forma directa de saber qué "property" editar) */}
+        <Button
+          icon="pi pi-pencil"
+          className="p-button-text p-button-sm"
+          onClick={() =>
+            handleEditSelection({
+              scheme: rowData.scheme,
+              property: rowData.properties[0],
+              chips: rowData.chips,
+              range: [0, 0],
+              node: rowData.node,
+              locationSets: rowData.locationSets,
+            })
+          }
         />
-        <Image
-          src="/trash.svg"
-          alt="Delete"
-          width={20}
-          height={20}
-          className="cursor-pointer"
-          style={{ filter: "invert(1)" }}
-          onClick={() => handleDeleteSelection(rowData)}
+        <Button
+          icon="pi pi-trash"
+          className="p-button-text p-button-sm p-button-danger"
+          onClick={() =>
+            handleDeleteSelection({
+              scheme: rowData.scheme,
+              properties: rowData.properties,
+              chips: rowData.chips,
+              ranges: rowData.ranges,
+              node: rowData.node,
+              locationSets: rowData.locationSets,
+            })
+          }
         />
       </div>
     );
@@ -667,7 +760,6 @@ export default function Genfiles() {
                 icon="pi pi-upload"
                 onClick={handleLoadFile}
                 className="p-button-help"
-              
               />
 
               <p>Seleccionar nodo destino</p>
@@ -777,15 +869,15 @@ export default function Genfiles() {
       {/* Panel/columna derecha */}
       <div className="genfiles-rightPanel">
         <footer className="genfiles-footer">
+          {/* 
+            Ahora, en vez de mostrar savedSelections “tal cual”,
+            usamos groupedSelections para unir en 1 fila las
+            selecciones con mismo (node, scheme). 
+          */}
           <DataTable
-            value={savedSelections}
-            selection={selectedRows}
-            onSelectionChange={(e) => setSelectedRows(e.value)}
+            value={groupedSelections}
             className="genfiles-datatable"
-            rowGroupMode="subheader"
-            sortField="node"
-            sortOrder={1}
-            selectionMode="multiple"
+            dataKey="node"
           >
             <Column
               field="node"
@@ -800,42 +892,39 @@ export default function Genfiles() {
               className="genfiles-column"
             />
             <Column
-              field="property"
               header="Atributos seleccionados"
               headerClassName="genfiles-columnHeader"
               className="genfiles-column"
+              body={(rowData: GroupedSelection) => rowData.properties.join(" | ")}
             />
             <Column
-              field="chips"
               header="Elementos"
               headerClassName="genfiles-columnHeader"
-              body={(rowData: Selection) => rowData.chips.join(", ")}
               className="genfiles-column"
+              body={(rowData: GroupedSelection) => rowData.chips.join(", ")}
+              
             />
             <Column
-              field="range"
               header="Rango"
               headerClassName="genfiles-columnHeader"
-              body={(rowData: Selection) =>
-                `${rowData.range[0]} - ${rowData.range[1]}`
-              }
               className="genfiles-columnRange"
+              body={(rowData: GroupedSelection) => rowData.ranges.join(" | ")}
             />
             <Column
               header="Ubicaciones"
               headerClassName="genfiles-columnHeader"
-              body={(rowData: Selection) =>
+              className="genfiles-column"
+              body={(rowData: GroupedSelection) =>
                 rowData.locationSets
                   .map((ls) => `${ls.location}: ${ls.numFiles}`)
                   .join(" | ")
               }
-              className="genfiles-column"
             />
             <Column
-              body={actionBodyTemplate}
               header="Acciones"
               headerClassName="genfiles-columnHeader"
               className="genfiles-column"
+              body={groupedActionBodyTemplate}
             />
           </DataTable>
 
@@ -848,7 +937,6 @@ export default function Genfiles() {
             <Button
               onClick={handleDownloadZip}
               label="Descargar ZIP"
-              icon="pi pi-arrow-circle-down"
               className="genfiles-btnDownload"
             />
             <Button
@@ -935,7 +1023,7 @@ export default function Genfiles() {
                   >
                     <button
                       onClick={handleCloseModal}
-                      className="absolute top-2 right-2 text-[#f1f1f1] text-lg"
+                      className="p-button-modal-close"
                     >
                       &times;
                     </button>
@@ -969,13 +1057,13 @@ export default function Genfiles() {
                             toast.error("El contenido no es un JSON válido.");
                           }
                         }}
-                        className="bg-[#43AE6A] text-[#f1f1f1] px-4 py-2 rounded"
+                        className="p-button-modal-save"
                       >
                         Guardar Cambios
                       </button>
                       <button
                         onClick={handleCloseModal}
-                        className="bg-[#D7483E] text-white px-4 py-2 rounded"
+                        className="p-button-modal-cancel"
                       >
                         Cancelar
                       </button>

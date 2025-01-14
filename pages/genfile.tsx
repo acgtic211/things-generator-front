@@ -28,6 +28,25 @@ interface FileContent {
   };
 }
 
+// Ejemplo de inferir un tipo "nuevo" si identify_type da error
+interface Document {
+  id: string;
+}
+
+function inferLocalTypeFromDocId(doc: Document): string {
+  // Supongamos que el doc tiene "id": "myDevice123"
+  // y decides quedarte con "myDevice" como nuevo tipo
+  if (!doc?.id) return 'unknown';
+
+  // Corta en ":" si existe
+  const splitted = doc.id.split(':');
+  const lastSegment = splitted[splitted.length - 1];
+
+  // Remueve dígitos, e.g. "myDevice123" => "myDevice"
+  const inferred = lastSegment.replace(/\d+$/, '');
+  return inferred || 'unknown';
+}
+
 export default function Genfile() {
   const [schemes, setSchemes] = useState<string[]>([]);
   const [selectedScheme, setSelectedScheme] = useState<string | null>(null);
@@ -122,34 +141,64 @@ export default function Genfile() {
     }
   };
 
-  const handleLoadFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLoadFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        try {
-          const content = JSON.parse(e.target?.result as string);
-          setDisplayedFileContent(content);
-          setEditableText(JSON.stringify(content, null, 2));
+    if (!file) return;
 
-          // Intentar identificar el tipo
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const content = JSON.parse(e.target?.result as string);
+        setDisplayedFileContent(content);
+        setEditableText(JSON.stringify(content, null, 2));
+
+        // 1) Preguntar al backend si reconoce el tipo
+        try {
           const response = await axios.post(
             'http://127.0.0.1:5000/identify_type',
             { schema: content },
             { headers: { 'Content-Type': 'application/json' } }
           );
           if (response.status === 200 && response.data.type) {
+            // El backend reconoció un tipo existente
             setSelectedScheme(response.data.type);
+            // Verificamos si ya está en 'schemes', si no, lo añadimos:
+            setSchemes((prev) => {
+              if (!prev.includes(response.data.type)) {
+                return [...prev, response.data.type];
+              }
+              return prev;
+            });
             toast.success(`Tipo identificado: ${response.data.type}`);
           } else {
-            toast.error('No se pudo identificar el tipo del esquema.');
+            // Respuesta 200 sin type -> teóricamente improbable, pero lo manejamos
+            toast.warning('Tipo no reconocido en el backend. Se intentará inferir localmente.');
+            registerLocalType(content);
           }
         } catch {
-          toast.error('Error al leer el archivo. Asegúrese de que es un archivo JSON válido.');
+          // Si el backend devolvió 404 o un error => no se encontró tipo
+          console.log('El backend no reconoce el tipo. Crearemos uno local.');
+          registerLocalType(content);
         }
-      };
-      reader.readAsText(file);
-    }
+      } catch {
+        toast.error('Error al leer el archivo. Asegúrese de que es un JSON válido.');
+      }
+    };
+
+    reader.readAsText(file);
+  };
+
+  // 2) Si no lo reconoce, creamos un "tipo local" y lo añadimos a schemes
+  const registerLocalType = (doc: Document) => {
+    const newType = inferLocalTypeFromDocId(doc);
+    setSelectedScheme(newType);
+    setSchemes((prev) => {
+      if (!prev.includes(newType)) {
+        return [...prev, newType];
+      }
+      return prev;
+    });
+    toast.info(`Tipo inferido localmente: ${newType}`);
   };
 
   const handleModify = async () => {
@@ -208,6 +257,7 @@ export default function Genfile() {
     link.click();
     link.remove();
   };
+  
 
   /* ------------------- Render ------------------- */
   return (
