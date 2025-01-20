@@ -1,5 +1,5 @@
 import Image from "next/image";
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import axios from "axios";
 import "./globals.css"; // Importa los estilos globales con nuestras clases custom
 import { Dropdown } from 'primereact/dropdown';
@@ -18,6 +18,9 @@ import { Montserrat } from 'next/font/google';
 import Editor from "react-simple-code-editor";
 import hljs from "highlight.js";
 import "highlight.js/styles/atom-one-dark.css"; // Estilo del editor
+
+
+type ChipState = 'unselected' | 'selected' | 'fixed';
 
 interface LocationSet {
   location: string;
@@ -107,17 +110,38 @@ export default function Genfiles() {
   const [isFileModalOpen, setIsFileModalOpen] = useState(false);
   const [openedFileContent, setOpenedFileContent] = useState<Record<string, unknown> | null>(null);
   const [editedFileContent, setEditedFileContent] = useState<string>("");
-
+  const [chipsState, setChipsState] = useState<Record<string, ChipState>>({});
+  // Devuelve la cantidad de chips en estado "selected"
+  const selectedChipsCount = useMemo(
+    () => Object.values(chipsState).filter((state) => state === "selected").length,
+    [chipsState]
+  );
   console.log(generatedDictionary);
+  console.log(selectedChips);
   // -------------------------------------------
   //  useEffects y funciones auxiliares
   // -------------------------------------------
   useEffect(() => {
+    if (chips.length > 0) {
+      const initialState: Record<string, ChipState> = {};
+      chips.forEach((chip) => {
+        initialState[chip] = 'unselected';
+      });
+      setChipsState(initialState);
+    }
+  }, [chips]);
+
+  useEffect(() => {
     axios
       .get("http://127.0.0.1:5000/things_types")
       .then((response) => {
-        const types = response.data;
-        const typesId = types.map((t: { id: string }) => t.id);
+        const types = response.data;  // [{ id: 'light', name: 'Bombilla'}, ...]
+        // Obtenemos sólo los 'id'
+        let typesId = types.map((t: { id: string }) => t.id);
+
+        // Ordenamos alfabéticamente
+        typesId = typesId.sort((a: string, b: string) => a.localeCompare(b));
+
         setGlobalSchemes(typesId);
         setSchemes(typesId);
       })
@@ -128,7 +152,9 @@ export default function Genfiles() {
     axios
       .get("http://127.0.0.1:5000/nodes_list")
       .then((response) => {
-        setNodesList(response.data);
+        // Clonamos y ordenamos alfabéticamente
+        const sortedNodes = [...response.data].sort((a, b) => a.localeCompare(b));
+        setNodesList(sortedNodes);
       })
       .catch((error) => {
         console.log("Error al obtener lista de nodos", error);
@@ -144,13 +170,15 @@ export default function Genfiles() {
     if (selectedScheme) {
       if (isGlobalType(selectedScheme)) {
         axios
-          .get(`http://127.0.0.1:5000/things_types/${selectedScheme}`)
-          .then((response) => {
-            setProperties(response.data);
-          })
-          .catch((error) => {
-            console.error("Error al obtener propiedades", error);
-          });
+        .get(`http://127.0.0.1:5000/things_types/${selectedScheme}`)
+        .then((response) => {
+          // response.data ya es un array de strings con las propiedades
+          const sortedProperties = [...response.data].sort((a, b) => a.localeCompare(b));
+          setProperties(sortedProperties);
+        })
+        .catch((error) => {
+          console.error("Error al obtener propiedades", error);
+        });
       } else {
         // Tipo de usuario: extraer las propiedades del doc correspondiente
         const doc = userDocs.find((d) => d.id && d.id.includes(selectedScheme));
@@ -175,7 +203,8 @@ export default function Genfiles() {
         axios
           .get(`http://127.0.0.1:5000/things_types/${selectedScheme}/${selectedProperty}`)
           .then((response) => {
-            setChips(response.data);
+            const sortedChips = [...response.data].sort((a, b) => a.localeCompare(b));
+            setChips(sortedChips);
           })
           .catch((error) => {
             console.error("Error al obtener esquemas", error);
@@ -195,22 +224,40 @@ export default function Genfiles() {
   }, [selectedScheme, selectedProperty, isGlobalType, userDocs]);
 
   useEffect(() => {
-    setSelectedChips([]);
-    setRangeValue([0, 0]);
-  }, [selectedProperty]);
+    if (valueRange[1] > selectedChipsCount) {
+      setRangeValue(([min]) => [min, selectedChipsCount]);
+    }
+    if (valueRange[0] > selectedChipsCount) {
+      // Si el min supera el max actual, lo forzamos a 0 (o a selectedChipsCount, según lo que quieras)
+      setRangeValue([0, selectedChipsCount]);
+    }
+  }, [selectedChipsCount, valueRange]);
+  
+  
 
   // -------------------------------------------
   //  Handlers
   // -------------------------------------------
   const handleChipClick = (chip: string) => {
-    setSelectedChips((prevSelectedChips) => {
-      const newSelectedChips = prevSelectedChips.includes(chip)
-        ? prevSelectedChips.filter((c) => c !== chip)
-        : [...prevSelectedChips, chip];
-      setRangeValue([0, newSelectedChips.length]);
-      return newSelectedChips;
-    });
-  };
+  setChipsState((prev) => {
+    const current = prev[chip];
+    let nextState: ChipState;
+    if (current === 'unselected') {
+      nextState = 'selected';
+    } else if (current === 'selected') {
+      nextState = 'fixed';
+    } else {
+      // current === 'fixed'
+      nextState = 'unselected';
+    }
+    return {
+      ...prev,
+      [chip]: nextState,
+    };
+  });
+};
+
+
 
   const handleLoadFile = () => {
     if (!filesToUpload || filesToUpload.length === 0) {
@@ -300,10 +347,6 @@ export default function Genfiles() {
       toast.error('El campo "Atributos seleccionados" debe tener un valor');
       return;
     }
-    if (selectedChips.length === 0) {
-      toast.error("Debe seleccionar al menos un chip");
-      return;
-    }
     if (locationSets.length === 0) {
       toast.error("Debe definir al menos una ubicación");
       return;
@@ -318,26 +361,43 @@ export default function Genfiles() {
         return;
       }
     }
-    const clonedLocationSets = locationSets.map((loc) => ({ ...loc }));
-
+    
+    // Construimos las dos listas
+    const chipsFixed: string[] = [];
+    const chipsSelected: string[] = [];
+  
+    Object.entries(chipsState).forEach(([chip, state]) => {
+      if (state === 'fixed') {
+        chipsFixed.push(chip);
+      } else if (state === 'selected') {
+        chipsSelected.push(chip);
+      }
+    });
+  
+    // IMPORTANTE: si tu lógica de "rango" se aplica solo a las chips "selected",
+    // y las "fixed" deben ir siempre, hay que tenerlo en cuenta (ver siguiente sección).
+  
+    // Guardamos en el objeto Selection, por ejemplo:
     const newSelection: Selection = {
       scheme: selectedScheme,
       property: selectedProperty,
-      chips: selectedChips,
+      chips: [
+        ...chipsFixed.map((chip) => "!" + chip),  // <---- forzadas con prefijo !
+        ...chipsSelected
+    ],
       range: valueRange,
       node: selectedNode,
-      locationSets: clonedLocationSets,
+      locationSets: locationSets.map((loc) => ({ ...loc })),
     };
-
+  
     setSavedSelections((prevSelections) => {
+      // Lógica de actualización que ya tenías...
       const existingIndex = prevSelections.findIndex(
         (sel) =>
           sel.scheme === selectedScheme &&
           sel.property === selectedProperty &&
           sel.node === selectedNode
       );
-      // Si ya había una selección con la misma combinación (node, scheme, property),
-      // la actualizamos, si no, la agregamos.
       if (existingIndex !== -1) {
         const updatedSelections = [...prevSelections];
         updatedSelections[existingIndex] = newSelection;
@@ -347,6 +407,7 @@ export default function Genfiles() {
       }
     });
   };
+  
 
   const handleEditSelection = (selection: Selection) => {
     setSelectedScheme(selection.scheme);
@@ -789,36 +850,42 @@ const handleDeleteSelection = (rowData: GroupedSelection) => {
                 className="genfiles-dropdownProps"
               />
 
-              <p>Seleccionar elementos (chips):</p>
-              <div className="genfiles-chipsContainer">
-                {chips.map((chip, index) => (
-                  <Chip
-                    key={index}
-                    label={chip}
-                    className={
-                      selectedChips.includes(chip)
-                        ? "chip-selected"
-                        : "chip-unselected"
-                    }
-                    onClick={() => handleChipClick(chip)}
-                  />
-                ))}
+              <div>
+                <p>Seleccionar elementos (chips):</p>
+                <div className="genfiles-chipsContainer">
+                  {chips.map((chip, index) => {
+                    const state = chipsState[chip] || 'unselected';
+                    return (
+                      <Chip
+                        key={index}
+                        label={chip}
+                        className={
+                          state === 'unselected'
+                            ? "chip-unselected"
+                            : state === 'selected'
+                            ? "chip-selected"
+                            : "chip-fixed"   // estado 'fixed'
+                        }
+                        onClick={() => handleChipClick(chip)}
+                      />
+                    );
+                  })}
+                </div>
               </div>
-
               <div className="genfiles-sliderWrapper">
-                <Slider
-                  value={valueRange}
-                  onChange={(e: SliderChangeEvent) =>
-                    setRangeValue(e.value as [number, number])
-                  }
-                  className="w-14rem"
-                  range
-                  min={0}
-                  max={selectedChips.length}
-                />
+              <Slider
+                value={valueRange}
+                onChange={(e: SliderChangeEvent) => setRangeValue(e.value as [number, number])}
+                className="w-14rem"
+                range
+                min={0}
+                max={selectedChipsCount}
+              />
+
                 <p className="genfiles-rangeText">
                   Rango seleccionado: {valueRange[0]}-{valueRange[1]}
                 </p>
+                <p>Elementos fijados: </p> {chips.filter((chip) => chipsState[chip] === 'fixed').join(", ")}
               </div>
 
               <p>Ubicaciones:</p>
@@ -834,10 +901,11 @@ const handleDeleteSelection = (rowData: GroupedSelection) => {
                     <InputNumber
                       value={ls.numFiles}
                       onValueChange={(e) =>
-                        handleLocationNumFilesChange(i, e.value || 1)
+                        handleLocationNumFilesChange(i, e.value as number)
                       }
                       min={1}
-                      className="w-full md:w-14rem p-1 border border-solid rounded-full custom-input-number"
+                      placeholder="Número de archivos"
+                      className="custom-input-number"
                     />
                     <Button
                       icon="pi pi-trash"
