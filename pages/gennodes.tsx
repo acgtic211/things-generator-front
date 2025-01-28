@@ -1,6 +1,6 @@
 import "./globals.css";
 import { InputNumber } from 'primereact/inputnumber';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from 'primereact/button';
 import { Montserrat } from 'next/font/google';
 import Image from 'next/image';
@@ -14,6 +14,7 @@ import 'primeicons/primeicons.css';
 import Editor from "react-simple-code-editor";
 import hljs from "highlight.js";
 import "highlight.js/styles/atom-one-dark.css"; // Estilo del editor
+import { Dropdown } from "primereact/dropdown";
 
 interface AtributoModificado {
   atributo: string;
@@ -42,9 +43,18 @@ interface ResumenItem {
   detalles_archivos?: ArchivoDetalle[];
 }
 
-interface LocationSet {
-  location: string;
-  numFiles: number;
+interface NodeConfig {
+  node: string;
+  location: string;  // un solo string para la ubicación
+  types: {
+    typeName: string;
+    numFiles: number;
+  }[];
+}
+
+interface ThingType {
+  id: string;
+  name: string;
 }
 
 // Para el explorador de archivos en la previsualización
@@ -74,11 +84,8 @@ const montserrat = Montserrat({
    COMPONENTE PARA GENERAR ARCHIVOS ALEATORIOS
    =============================================================================*/
 const GenerateRandomFiles = () => {
-  const [numNodes, setNumNodes] = useState<number>(1);
-  const [locationSets, setLocationSets] = useState<LocationSet[]>([]);
-  const [resumen, setResumen] = useState<ResumenItem[] | null>(null);
 
-  // ---------- ESTADOS NUEVOS PARA PREVISUALIZACIÓN Y EDICIÓN ----------
+  // ------------- ESTADOS PARA NODOS, TIPOS, DOCUMENTOS, RESUMEN -------------
   const [isPreviewVisible, setIsPreviewVisible] = useState(false);
   const [previewData, setPreviewData] = useState<FileItem[]>([]);
   const [isFileModalOpen, setIsFileModalOpen] = useState(false);
@@ -90,72 +97,227 @@ const GenerateRandomFiles = () => {
   } | null>(null);
   const [editedFileContent, setEditedFileContent] = useState<string>("");
 
-  // --------- Funciones para manejar ubicaciones (lo tenías igual) ---------
-  const handleAddLocationSet = () => {
-    setLocationSets((prev) => [...prev, { location: "", numFiles: 1 }]);
-  };
+  // Cantidad de nodos
+  const [numNodos, setNumNodos] = useState<number>(1);
+  // Lista de nombres de nodos generados (p.e. ["nodo_0", "nodo_1", ...])
+  const [generatedNodes, setGeneratedNodes] = useState<string[]>([]);
+  // Configuración de cada nodo
+  const [nodeConfigs, setNodeConfigs] = useState<NodeConfig[]>([]);
 
-  const handleRemoveLocationSet = (index: number) => {
-    setLocationSets((prev) => prev.filter((_, i) => i !== index));
-  };
+  // Documentos personalizados que se suben como JSON
+  const [customDocs, setCustomDocs] = useState<{ filename: string; content: Record<string, unknown> }[]>([]);
 
-  const handleLocationChange = (index: number, value: string) => {
-    setLocationSets((prev) => {
-      const newSets = [...prev];
-      newSets[index].location = value;
-      return newSets;
+  // Tipos globales retornados por el backend (things_types)
+  const [thingsTypes, setThingsTypes] = useState<ThingType[]>([]);
+
+  // Resumen final de archivos generados
+  const [resumen, setResumen] = useState<ResumenItem[]>([]);
+
+  // ============== CARGAR LISTA DE TIPOS (THINGS_TYPES) ==============
+  useEffect(() => {
+    axios.get('http://127.0.0.1:5000/things_types')
+      .then((res) => setThingsTypes(res.data))
+      .catch((err) => console.error('Error al cargar things_types:', err));
+  }, []);
+
+  // ============== ACTUALIZAR nodeConfigs AL CREAR NODOS ==============
+  useEffect(() => {
+    setNodeConfigs((prev) => {
+      const newConfigs = generatedNodes.map((nodo) => {
+        const existing = prev.find((nc) => nc.node === nodo);
+        if (existing) return existing;
+        return {
+          node: nodo,
+          location: "",
+          types: []
+        };
+      });
+      return newConfigs;
     });
-  };
+  }, [generatedNodes]);
 
-  const handleLocationNumFilesChange = (index: number, value: number) => {
-    setLocationSets((prev) => {
-      const newSets = [...prev];
-      newSets[index].numFiles = value;
-      return newSets;
-    });
-  };
 
-  // ============== Generar archivos aleatorios (igual a tu código actual) ==============
-  const handlePrepareRandomFiles = async () => {
-    if (locationSets.length === 0) {
-      toast.error("Debe agregar al menos una ubicación.");
-      return;
+  /* =========================================================================
+     1) GENERAR NODOS (carpetas) en el BACKEND 
+     =========================================================================*/
+  const handleGenerateNodes = async () => {
+    try {
+      const res = await axios.post('http://127.0.0.1:5000/generate_nodes/', {
+        num_nodos: numNodos
+      });
+      const nodos = res.data.nodos || [];
+      setGeneratedNodes(nodos);
+      toast.success(`Se han generado ${nodos.length} nodos en el backend`);
+    } catch (err) {
+      console.error(err);
+      toast.error("Error al generar nodos");
     }
-    for (const ls of locationSets) {
-      if (!ls.location.trim()) {
-        toast.error("Todas las ubicaciones deben tener un nombre.");
+  };
+
+  /* =========================================================================
+     2) Manejo de UBICACIÓN en cada nodo
+     =========================================================================*/
+  const handleNodeLocationChange = (nodeIndex: number, newLocation: string) => {
+    setNodeConfigs((prev) => {
+      const updated = [...prev];
+      updated[nodeIndex].location = newLocation;
+      return updated;
+    });
+  };
+
+  /* =========================================================================
+     3) Manejo de TIPOS (varios) en cada nodo
+     =========================================================================*/
+  const handleAddType = (nodeIndex: number) => {
+    setNodeConfigs((prev) => {
+      const updated = [...prev];
+      updated[nodeIndex].types.push({ typeName: "", numFiles: 1 });
+      return updated;
+    });
+  };
+
+  const handleRemoveType = (nodeIndex: number, typeIndex: number) => {
+    setNodeConfigs((prev) => {
+      const updated = [...prev];
+      updated[nodeIndex].types.splice(typeIndex, 1);
+      return updated;
+    });
+  };
+
+  const handleTypeNameChange = (nodeIndex: number, typeIndex: number, newType: string) => {
+    setNodeConfigs((prev) => {
+      const updated = [...prev];
+      updated[nodeIndex].types[typeIndex].typeName = newType;
+      return updated;
+    });
+  };
+
+  const handleNumFilesChange = (nodeIndex: number, typeIndex: number, newVal: number) => {
+    setNodeConfigs((prev) => {
+      const updated = [...prev];
+      updated[nodeIndex].types[typeIndex].numFiles = newVal;
+      return updated;
+    });
+  };
+
+  /* =========================================================================
+     4) Subir archivos JSON (docs custom) -> handleFileUpload
+     =========================================================================*/
+     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = e.target.files;
+      if (!files) return;
+    
+      const newDocs = [...customDocs];  // customDocs es tu state
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        try {
+          const text = await file.text();
+          const jsonData = JSON.parse(text);
+    
+          // En tu JSON, el "id" podría ser "acg:home:blind13"
+          // Extraemos la parte que nos interesa:
+          const rawId = jsonData.id || file.name;    // por si no trae "id" en el JSON
+          const parsedId = parseDocId(rawId);        // "blind"
+          
+          // Guardamos en newDocs un "content" con el id original,
+          // y además podríamos sobreescribir el ID si prefieres
+          // que en el backend también llegue "id": "blind"
+          // (Depende de tu lógica).
+          jsonData.id = parsedId;  
+          
+          newDocs.push({
+            filename: file.name,
+            content: jsonData
+          });
+    
+          toast.success(`Archivo ${file.name} cargado correctamente`);
+        } catch (error) {
+          console.error("Error parseando JSON:", error);
+          toast.error(`Error parseando el archivo ${file.name}`);
+        }
+      }
+      setCustomDocs(newDocs);
+    };
+    
+
+    /**
+   * Recibe un id estilo "acg:home:blind13"
+   * - Toma el último segmento tras los ":" → "blind13"
+   * - Quita dígitos finales → "blind"
+   * - Devuelve el resultado ("blind")
+   */
+  function parseDocId(fullId: string): string {
+    // 1) Separar por ':'
+    const segments = fullId.split(':');
+    // 2) Último segmento
+    let lastSegment = segments[segments.length - 1];  // "blind13"
+    // 3) Eliminar dígitos del final
+    lastSegment = lastSegment.replace(/\d+$/, '');    // "blind"
+    // Si quedara vacío, usa fallback
+    return lastSegment || 'unknown';
+  }
+
+  /* =========================================================================
+     5) Unir thingsTypes + customDocs en un solo array para el Dropdown
+     =========================================================================*/
+  const allTypeOptions = [
+    ...thingsTypes.map((t) => ({ label: t.name, value: t.id })),
+    ...customDocs.map((doc) => {
+      const docId = doc.content?.id || doc.filename;
+      return {
+        label: `Custom: ${docId}`,
+        value: docId
+      };
+    })
+  ];
+
+  /* =========================================================================
+     6) GENERAR ARCHIVOS ALEATORIOS (llamada al backend)
+     =========================================================================*/
+  const handlePrepareRandomFiles = async () => {
+    // Validaciones mínimas
+    for (const nc of nodeConfigs) {
+      if (!nc.location.trim()) {
+        toast.error(`El nodo ${nc.node} no tiene ubicación definida`);
         return;
       }
-      if (ls.numFiles <= 0) {
-        toast.error("El número de archivos por ubicación debe ser mayor que 0.");
+      if (nc.types.length === 0) {
+        toast.error(`El nodo ${nc.node} no tiene tipos definidos`);
         return;
+      }
+      for (const t of nc.types) {
+        if (!t.typeName) {
+          toast.error(`Uno de los tipos en ${nc.node} está vacío`);
+          return;
+        }
+        if (t.numFiles < 1) {
+          toast.error(`El tipo ${t.typeName} en ${nc.node} tiene numFiles < 1`);
+          return;
+        }
       }
     }
 
     try {
       const payload = {
-        num_nodos: numNodes,
-        ubicaciones: locationSets
+        nodeConfigs,
+        user_docs: customDocs  // Enviamos los JSON subidos
       };
-
-      const res = await axios.post('http://127.0.0.1:5000/prepare_random_files/', payload, {
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
-
-      setResumen(res.data.resumen);
-      toast.success('Archivos preparados exitosamente. Ahora puedes descargar el ZIP.');
-      // En caso de haber estado en "previsualización", lo ocultamos
-      setIsPreviewVisible(false);
-      setPreviewData([]);
-    } catch (error) {
-      console.error('Error preparing random files:', error);
-      toast.error('Error al preparar archivos aleatorios');
+      const res = await axios.post(
+        'http://127.0.0.1:5000/prepare_random_files/',
+        payload,
+        { headers: { 'Content-Type': 'application/json' } }
+      );
+      setResumen(res.data.resumen || []);
+      toast.success("Archivos generados. Puedes descargar el ZIP.");
+    } catch (err) {
+      console.error(err);
+      toast.error("Error al generar archivos");
     }
   };
 
-  // ============== Descargar ZIP ==============
+  /* =========================================================================
+     7) Descargar ZIP
+     =========================================================================*/
   const handleDownloadZip = async () => {
     try {
       const res = await axios.get('http://127.0.0.1:5000/download_random_files', {
@@ -174,42 +336,22 @@ const GenerateRandomFiles = () => {
     }
   };
 
-  // ---------- Construcción de estructura de previsualización ----------
-  /**
-   * Convertimos el `resumen` en una jerarquía de nodos/tipos/archivos
-   * que podamos mostrar con un componente tipo "FileExplorer".
-   */
+
+  /* =========================================================================
+     PREVISUALIZACIÓN ESTRUCTURA
+     =========================================================================*/
   const buildPreviewStructure = (resumenData: ResumenItem[]): FileItem[] => {
-    /*
-      Estructura deseada:
-      [
-        {
-          name: nodo_0,
-          type: 'folder',
-          children: [
-            {
-              name: tipoX,
-              type: 'folder',
-              children: [
-                { name: 'ubicacion_0.json', type: 'file', node: 'nodo_0', tipo: 'tipoX' },
-                ...
-              ]
-            }
-          ]
-        }
-      ]
-    */
     const structure: FileItem[] = [];
 
     resumenData.forEach((item) => {
-      // 1) Buscamos (o creamos) el nodo en la estructura
+      // 1) Buscamos (o creamos) el nodo
       let nodoEntry = structure.find((f) => f.name === item.nodo);
       if (!nodoEntry) {
         nodoEntry = { name: item.nodo, type: 'folder', children: [] };
         structure.push(nodoEntry);
       }
 
-      // 2) En esa carpeta de nodo, buscamos (o creamos) la carpeta del tipo
+      // 2) Carpera del tipo
       if (!nodoEntry.children) nodoEntry.children = [];
 
       let tipoEntry = nodoEntry.children.find((f) => f.name === item.tipo);
@@ -218,10 +360,9 @@ const GenerateRandomFiles = () => {
         nodoEntry.children.push(tipoEntry);
       }
 
-      // 3) Agregar los archivos que se generaron
+      // 3) Archivos
       if (item.detalles_archivos && tipoEntry.children) {
         item.detalles_archivos.forEach((archivoDet) => {
-          // Ejemplo: archivoDet.archivo = "ubicacion_0"
           const fileName = archivoDet.archivo + ".json"; 
           tipoEntry!.children!.push({
             name: fileName,
@@ -236,15 +377,11 @@ const GenerateRandomFiles = () => {
     return structure;
   };
 
-  // ============== Previsualización (similar a genfiles) ==============
   const handleTogglePreview = () => {
-    // Si no existe el resumen, no podemos construir nada
     if (!resumen || resumen.length === 0) {
       toast.error("No hay datos de resumen para previsualizar.");
       return;
     }
-
-    // Si vamos a mostrar la previsualización, construimos la estructura
     if (!isPreviewVisible) {
       const structure = buildPreviewStructure(resumen);
       setPreviewData(structure);
@@ -252,7 +389,7 @@ const GenerateRandomFiles = () => {
     setIsPreviewVisible(!isPreviewVisible);
   };
 
-  // ============== Explorador de archivos (igual que en Genfiles) ==============
+  // Explorador de archivos
   const FileExplorer = ({
     estructura,
     onFileSelect
@@ -287,20 +424,17 @@ const GenerateRandomFiles = () => {
     return <div>{renderNodes(estructura)}</div>;
   };
 
-  // ============== Abrir archivo ==============
   const handleFileOpen = async (file: { name: string; node?: string; tipo?: string }) => {
     if (!file.node || !file.tipo || !file.name) {
       toast.error("Faltan datos para abrir el archivo (nodo, tipo o nombre).");
       return;
     }
 
-   
-
     try {
       const res = await axios.get(
         `http://127.0.0.1:5000/open_file/${encodeURIComponent(file.node)}/${encodeURIComponent(
           file.tipo
-        )}/${encodeURIComponent(file.name)}`
+        )}/${encodeURIComponent(file.name)}` 
       );
       setOpenedFileContent({
         node: file.node,
@@ -309,7 +443,6 @@ const GenerateRandomFiles = () => {
         content: res.data,
       });
       setIsFileModalOpen(true);
-      // Limpia la edición previa
       setEditedFileContent(JSON.stringify(res.data, null, 2));
     } catch (error) {
       console.error("Error al abrir el archivo:", error);
@@ -317,22 +450,18 @@ const GenerateRandomFiles = () => {
     }
   };
 
-  // ============== Guardar archivo editado ==============
+  // Guardar archivo editado
   const handleSaveFile = async () => {
     if (!openedFileContent) return;
     const { node, tipo, name } = openedFileContent;
     try {
-      // Validar que editedFileContent sea JSON válido
       const parsed = JSON.parse(editedFileContent);
-
       await axios.post(
         `http://127.0.0.1:5000/save_file/${encodeURIComponent(node)}/${encodeURIComponent(
           tipo
         )}/${encodeURIComponent(name)}`,
         { content: parsed },
-        {
-          headers: { "Content-Type": "application/json" },
-        }
+        { headers: { "Content-Type": "application/json" } }
       );
       toast.success("Archivo guardado correctamente.");
       handleCloseModal();
@@ -348,80 +477,134 @@ const GenerateRandomFiles = () => {
     setEditedFileContent("");
   };
 
-  // ============== Render ==============
-  const totalFiles = locationSets.reduce((sum, ls) => sum + ls.numFiles, 0);
-
   return (
     <div className="gennodes-randomContainer">
       {/* Sección izquierda: inputs y botones */}
-      <div className="gennodes-randomLeftPanel">
-        <p className="text-[#f1f1f1]">Número de nodos</p>
-        <InputNumber
-          value={numNodes}
-          onValueChange={(e) => setNumNodes(e.value || 1)}
-          min={1}
-          className="custom-input-number"
-        />
-
-        <p className="gennodes-textMarginTop">Ubicaciones:</p>
-        <div className="gennodes-locationsList">
-          {locationSets.map((ls, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <InputText
-                value={ls.location}
-                onChange={(e) => handleLocationChange(i, e.target.value)}
-                placeholder="Nombre de la ubicación"
-                className="custom-input-text"
-              />
-              <InputNumber
-                value={ls.numFiles}
-                onValueChange={(e) => handleLocationNumFilesChange(i, e.value || 1)}
-                min={1}
-                className="custom-input-number"
-              />
-              <Button
-                icon="pi pi-trash"
-                className="p-button-danger"
-                onClick={() => handleRemoveLocationSet(i)}
-              />
-            </div>
-          ))}
+      <div style={{ color: '#FFF' }}>
+        <h2>Generar Nodos</h2>
+        <div style={{ marginBottom: '1rem' }}>
+          <span>Cantidad de nodos:</span>
+          <InputNumber
+            value={numNodos}
+            onValueChange={(e) => setNumNodos(e.value || 1)}
+            min={1}
+            style={{ marginLeft: '1rem' }}
+            className="custom-input-number"
+          />
           <Button
-            label="Agregar ubicación"
-            icon="pi pi-plus"
-            onClick={handleAddLocationSet}
-            className="gennodes-btnAddLocation"
+            label="Generar Nodos"
+            onClick={handleGenerateNodes}
+            style={{ marginLeft: '1rem' }}
+            className="gennodes-btnGenerateNodes"
           />
         </div>
 
-        <p className="gennodes-textMarginTop">
-          Total de archivos: {totalFiles}
-        </p>
+        {/* INPUT para subir archivos JSON */}
+        <div style={{ marginBottom: '1rem' }}>
+          <label htmlFor="fileUpload" className="gennodes-fileUploadLabel">Subir archivos JSON (TDs personalizados):</label>
+          <input type="file" accept=".json" multiple onChange={handleFileUpload} title="Upload JSON files" />
+        </div>
 
-        <div className="flex-col mt-4">
-          <Button
-            label="Generar Archivos"
-            onClick={handlePrepareRandomFiles}
-            className="gennodes-btnGenerateRandom"
-          />
-          <Button
-            label="Descargar ZIP"
-            onClick={handleDownloadZip}
-            className="gennodes-btnDownloadZip"
-          />
-          <Button
-            label={isPreviewVisible ? "Mostrar Resumen" : "Previsualizar Estructura"}
-            onClick={handleTogglePreview}
-            className="gennodes-btnDownloadZip"
-          />
-          <Link href="/" passHref>
+        {generatedNodes.length > 0 && (
+          <div>
+            <h3>Configuraciones por Nodo</h3>
+            {/* Aquí recorremos cada nodo */}
+            {nodeConfigs.map((nc, nodeIndex) => (
+              <div
+                key={nc.node}
+                style={{
+                  border: '1px solid #aaa',
+                  margin: '1rem 0',
+                  padding: '1rem'
+                }}
+              >
+                <p>
+                  <b>{nc.node}</b>
+                </p>
+
+                {/* Campo de ubicación para este nodo */}
+                <label>Ubicación: </label>
+                <InputText
+                  value={nc.location}
+                  onChange={(e) => handleNodeLocationChange(nodeIndex, e.target.value)}
+                  style={{ marginLeft: '0.5rem' }}
+                  className="custom-input-text"
+                />
+
+                <div style={{ marginTop: '1rem' }}>
+                  <Button
+                    label="Añadir Tipo"
+                    onClick={() => handleAddType(nodeIndex)}
+                    className="gennodes-btnAddType"
+                  />
+                </div>
+
+                {/* Para cada tipo */}
+                {nc.types.map((t, tIndex) => (
+                  <div
+                    key={tIndex}
+                    style={{
+                      border: '1px solid #555',
+                      margin: '0.5rem 0',
+                      padding: '0.5rem'
+                    }}
+                  >
+                    <Dropdown
+                      value={t.typeName}
+                      options={allTypeOptions} // Combinación de tiposs globales + JSON subidos
+                      onChange={(e) => handleTypeNameChange(nodeIndex, tIndex, e.value)}
+                      placeholder="Selecciona tipo"
+                      style={{ marginRight: '1rem' }}
+                      className="custom-dropdown"
+                    />
+
+                    <InputNumber
+                      value={t.numFiles}
+                      onValueChange={(e) => handleNumFilesChange(nodeIndex, tIndex, e.value || 1)}
+                      min={1}
+                      style={{ width: '5rem', marginRight: '1rem' }}
+                      className="custom-input-number"
+                    />
+
+                    <Button
+                      icon="pi pi-trash"
+                      className="p-button-danger p-button-sm"
+                      onClick={() => handleRemoveType(nodeIndex, tIndex)}
+                    />
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Botones finales para generar archivos y descargar ZIP */}
+        {generatedNodes.length > 0 && (
+          <div style={{ marginTop: '1rem' }}>
             <Button
-              label="Página principal"
-              icon="pi pi-home"
-              className="gennodes-btnHomeRandom"
+              label="Generar Archivos"
+              onClick={handlePrepareRandomFiles}
+              style={{ marginRight: '1rem' }}
+              className="gennodes-btnGenerateRandom"
             />
-          </Link>
-        </div>
+            <Button
+              label="Descargar ZIP"
+              onClick={handleDownloadZip}
+              className="gennodes-btnDownloadZip"
+            />
+            <Button
+              label={isPreviewVisible ? "Mostrar Resumen" : "Previsualizar Estructura"}
+              onClick={handleTogglePreview}
+              className="gennodes-btnPreview"
+            />
+            <Link href="/" passHref>
+              <Button
+                label="Página principal"
+                className="gennodes-btnHomeRandom"
+              />
+            </Link>
+          </div>
+        )}
       </div>
 
       {/* Sección derecha: mostrar Resumen o Previsualización */}
@@ -430,18 +613,19 @@ const GenerateRandomFiles = () => {
 
         {!isPreviewVisible ? (
           // =========== VISTA DEL RESUMEN ===========
-          resumen ? (
-            resumen.map((info, index) => (
+          resumen && resumen.length > 0 ? (
+            resumen.map((info: ResumenItem, index: number) => (
               <div key={index} className="gennodes-summaryBlock">
                 <p>
-                  Se han generado para el nodo &apos;{info.nodo}&apos;:{" "}
-                  {info.numero_archivos} archivos de tipo &apos;{info.tipo}&apos;.
+                  Se han generado para el nodo {info.nodo}:{" "}
+                  {info.numero_archivos} archivos de tipo {info.tipo}.
                 </p>
                 {info.atributos_modificados.map((attr, i) => {
                   const elementos = attr.elementos.join(", ");
                   return (
                     <span key={i}>
-                      Atributo &apos;{attr.atributo}&apos; con elementos [{elementos}] y rango [{attr.rango[0]}, {attr.rango[1]}]
+                      Atributo {attr.atributo} con elementos [{elementos}] y rango [
+                      {attr.rango[0]}, {attr.rango[1]}]
                       <br />
                     </span>
                   );
@@ -450,12 +634,14 @@ const GenerateRandomFiles = () => {
                 {info.combinaciones_atributos &&
                   Object.keys(info.combinaciones_atributos).map((atributo, i) => (
                     <div key={i} className="gennodes-summarySpacing">
-                      <p>Combinaciones para el atributo &apos;{atributo}&apos;:</p>
-                      {info.combinaciones_atributos && Object.entries(info.combinaciones_atributos[atributo]).map(([comboStr, count], j) => (
-                        <p key={j}>
-                          {count} archivos con {comboStr || "sin propiedades"}
-                        </p>
-                      ))}
+                      <p>Combinaciones para el atributo {atributo}:</p>
+                      {Object.entries(info.combinaciones_atributos?.[atributo] ?? {}).map(
+                        ([comboStr, count], j) => (
+                          <p key={j}>
+                            {count} archivos con {comboStr || "sin propiedades"}
+                          </p>
+                        )
+                      )}
                     </div>
                   ))}
 
@@ -467,7 +653,7 @@ const GenerateRandomFiles = () => {
                         <p>Archivo {archivo.archivo}:</p>
                         {archivo.atributos.map((a, m) => (
                           <p key={m}>
-                            Atributo &apos;{a.atributo}&apos; con propiedades:{" "}
+                            Atributo {a.atributo} con propiedades:{" "}
                             {a.propiedades_seleccionadas.join(", ")}
                           </p>
                         ))}
@@ -538,7 +724,7 @@ const GenerateRandomFiles = () => {
 };
 
 /* =============================================================================
-   COMPONENTE PARA GENERAR NODOS (igual al tuyo, se deja intacto)
+   COMPONENTE PARA GENERAR NODOS 
    =============================================================================*/
 const GenerateNodes = () => {
   const [numNodos, setNumNodos] = useState<number>(1);
@@ -573,6 +759,7 @@ const GenerateNodes = () => {
         min={1}
         className="custom-input-number"
       />
+      
       <div className="flex-col mt-4">
         <Button
           label="Generar Nodos"
