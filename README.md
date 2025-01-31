@@ -30,7 +30,7 @@ La aplicación tiene 3 páginas divididas por su funcionalidad:
 - Generar varios archivos
 
 ### Página principal
-![[Pasted image 20250131111005.png]]
+![Pagina principal](imgs/Screenshot%202025-01-31%20111002.png)
 En la página principal se muestran las dos opciones principales de la aplicación. Haciendo click en una de ellas, se accede a las funcionalidades de generar un solo archivo o varios por separado.
 ### Generar un archivo
 ![[Pasted image 20250129184457.png]]
