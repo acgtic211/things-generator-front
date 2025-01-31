@@ -21,7 +21,7 @@ import "highlight.js/styles/atom-one-dark.css"; // Estilo del editor
 
 
 /* estados posibles de un chip a la hora de seleccionarlos */
-type ChipState = 'unselected' | 'selected' | 'fixed';
+type ChipState = 'unselected' | 'selected';
 
 /* Tipos de las estructuras de datos */
 
@@ -35,8 +35,8 @@ interface LocationSet {
 interface Selection {
   scheme: string | null;
   property: string | null;
-  chips: string[];
-  range: [number, number];
+  chips: string[];           // p.ej. ["!ledOn","lightOn","switch"]
+  range: [number, number];   // p.ej. [0,2]
   node: string | null;
   locationSets: LocationSet[];
 }
@@ -47,36 +47,32 @@ interface UserDoc {
   [key: string]: unknown;
 }
 
-/* Estructura de un atributo modificado*/
-interface AtributoModificado {
-  atributo: string;
-  elementos: string[];
-  rango: [number, number];
-}
+
 
 /* Estructura de un item del resumen: Guarda todos los valores utilizados para generar un resumen de los archivos generados a partir de la selección realizada */
 interface ResumenItem {
-  nodo: string; // Nodo destino
-  tipo: string; // Tipo de esquema
-  numero_archivos: number; // Número de archivos generados
-  atributos_modificados: AtributoModificado[]; // Atributos modificados
-  detalles_archivos?: { // Detalles por archivo
-    archivo: string; // Nombre del archivo
-    atributos: { // Atributos seleccionados
-      atributo: string; // Nombre del atributo
-      propiedades_seleccionadas: string[]; // Propiedades seleccionadas
+  nodo: string;
+  tipo: string;
+  numero_archivos: number;
+  detalles_archivos?: {
+    archivo: string;
+    atributos: {
+      atributo: string;
+      propiedades_incluidas: string[]; // OJO: ahora viene 'propiedades_incluidas'
     }[];
   }[];
-  combinaciones_atributos?: { // Combinaciones de propiedades para un atributo
-    [atributo: string]: { // Nombre del atributo
-      [comboStr: string]: number; // Combinaciones de propiedades
+  // El backend ya no envía combinaciones_atributos ni conteo_atributos,
+  // pero si tu backend las genera, puedes seguir mostrándolas.
+  combinaciones_atributos?: {
+    [atributo: string]: {
+      [comboStr: string]: number;
     };
   };
-  conteo_atributos?: { // Conteo de atributos
-    atributo: string; // Nombre del atributo
-    con_prop: number; // Si se ha incluido en el archivo la propiedad (rango > 0)
-    sin_prop: number; // Si no se ha incluido en el archivo la propiedad (rango = 0)
-    elementos: string[]; // Elementos seleccionados
+  conteo_atributos?: {
+    atributo: string;
+    con_prop: number;
+    sin_prop: number;
+    elementos: string[];
   }[];
 }
 interface FileItem { // Estructura de un item de la previsualización de archivos
@@ -84,15 +80,17 @@ interface FileItem { // Estructura de un item de la previsualización de archivo
   children?: FileItem[]; // Hijos del archivo
   node?: string; // nombre del nodo dondes se ha guardado
 }
-
+interface GroupedSubSelection {
+  property: string;
+  chips: string[];
+  range: string;  // "0 - 2", "0 - 1", ...
+}
 // Estructura que usaremos al agrupar (unificar) varias Selection en una sola.
 interface GroupedSelection {
-  node: string; // Nodo destino
-  scheme: string; // Tipo de esquema
-  properties: string[]; // Ej.: ["properties", "actions"]
-  chips: string[];      // Unión de todos los chips
-  ranges: string[];     // Ej.: ["0 - 3", "0 - 4"]
-  locationSets: LocationSet[]; // Unión (o fusión) de las ubicaciones
+  node: string;
+  scheme: string;
+  subSelections: GroupedSubSelection[];
+  locationSets: LocationSet[];
 }
 
 const montserrat = Montserrat({ // Fuente utilizada en la aplicación (probablemente no necesaria ya que se ha incluido en los estilos globales)
@@ -102,32 +100,33 @@ const montserrat = Montserrat({ // Fuente utilizada en la aplicación (probablem
 
 export default function Genfiles() { // Componente principal
   const [filesToUpload, setFilesToUpload] = useState<FileList | null>(null); // Archivos subidos por el usuario
-  const [userDocs, setUserDocs] = useState<UserDoc[]>([]);
-  const [globalSchemes, setGlobalSchemes] = useState<string[]>([]);
-  const [schemes, setSchemes] = useState<string[]>([]);
-  const [selectedScheme, setSelectedScheme] = useState<string | null>(null);
-  const [properties, setProperties] = useState<string[]>([]);
-  const [selectedProperty, setSelectedProperty] = useState<string | null>(null);
-  const [chips, setChips] = useState<string[]>([]);
-  const [selectedChips, setSelectedChips] = useState<string[]>([]);
-  const [valueRange, setRangeValue] = useState<[number, number]>([0, 1]);
-  const [savedSelections, setSavedSelections] = useState<Selection[]>([]);
-  const [selectedNode, setSelectedNode] = useState<string | null>(null);
-  const [nodes, setNodesList] = useState<string[]>([]);
-  const [generatedDictionary, setGeneratedDictionary] = useState<Record<string, Record<string, { atributos: Record<string, { elementosSeleccionados: string[]; rango: [number, number]; }>; ubicaciones: LocationSet[]; }>> | null>(null);
-  const [resumen, setResumen] = useState<ResumenItem[] | null>(null);
-  const [locationSets, setLocationSets] = useState<LocationSet[]>([]);
-  const [previewData, setPreviewData] = useState<FileItem[]>([]);
-  const [isPreviewVisible, setIsPreviewVisible] = useState(false);
-  const [isFileModalOpen, setIsFileModalOpen] = useState(false);
-  const [openedFileContent, setOpenedFileContent] = useState<Record<string, unknown> | null>(null);
-  const [editedFileContent, setEditedFileContent] = useState<string>("");
-  const [chipsState, setChipsState] = useState<Record<string, ChipState>>({});
+  const [userDocs, setUserDocs] = useState<UserDoc[]>([]); // Documentos subidos por el usuario
+  const [globalSchemes, setGlobalSchemes] = useState<string[]>([]); // Esquemas globales
+  const [schemes, setSchemes] = useState<string[]>([]); // Esquemas seleccionables (tipos: light, movement, ...)
+  const [selectedScheme, setSelectedScheme] = useState<string | null>(null); // Esquema seleccionado
+  const [properties, setProperties] = useState<string[]>([]); // lista de properties, actions, etc del esquema seleccionado
+  const [selectedProperty, setSelectedProperty] = useState<string | null>(null); // atributo seleccionado del tipo seleccionado
+  const [chips, setChips] = useState<string[]>([]); // lista de elementos seleccionables del properties, actions, etc seleccionado
+  const [selectedChips, setSelectedChips] = useState<string[]>([]); // elementos seleccionado de la lista de chips
+  const [valueRange, setRangeValue] = useState<[number, number]>([0, 1]); // Rango de aparición de los elementos seleccionados
+  const [savedSelections, setSavedSelections] = useState<Selection[]>([]); // Selecciones guardadas con guardar selección
+  const [selectedNode, setSelectedNode] = useState<string | null>(null); // Nodo destino seleccionado
+  const [nodes, setNodesList] = useState<string[]>([]); // Lista de nodos destino
+  const [generatedDictionary, setGeneratedDictionary] = useState<Record<string, Record<string, { atributos: Record<string, { elementosSeleccionados: string[]; rango: [number, number]; }[]>; ubicaciones: LocationSet[]; }>> | null>(null);
+  const [resumen, setResumen] = useState<ResumenItem[] | null>(null); // Resumen de los archivos generados
+  const [locationSets, setLocationSets] = useState<LocationSet[]>([]); // Ubicaciones
+  const [previewData, setPreviewData] = useState<FileItem[]>([]); // Estructura de previsualización de archivos
+  const [isPreviewVisible, setIsPreviewVisible] = useState(false); // Visibilidad de la previsualización
+  const [isFileModalOpen, setIsFileModalOpen] = useState(false); // Modal de edición de archivo
+  const [openedFileContent, setOpenedFileContent] = useState<Record<string, unknown> | null>(null); // Contenido del archivo abierto
+  const [editedFileContent, setEditedFileContent] = useState<string>(""); // Contenido del archivo editado
+  const [chipsState, setChipsState] = useState<Record<string, ChipState>>({}); // Estado de los chips (seleccionados, fijados, no seleccionados)
 
   console.log(generatedDictionary);
   console.log(selectedChips);
+
   // Devuelve la cantidad de chips en estado "selected"
-  const selectedChipsCount = useMemo(
+  const selectedChipsCount = useMemo( // Cantidad de chips seleccionados
     () => Object.values(chipsState).filter((state) => state === "selected").length,
     [chipsState]
   );
@@ -135,8 +134,8 @@ export default function Genfiles() { // Componente principal
   // -------------------------------------------
   //  useEffects y funciones auxiliares
   // -------------------------------------------
-  useEffect(() => {
-    if (chips.length > 0) {
+  useEffect(() => { // Inicialización de los estados de los chips
+    if (chips.length > 0) { // Si hay chips
       const initialState: Record<string, ChipState> = {};
       chips.forEach((chip) => {
         initialState[chip] = 'unselected';
@@ -145,7 +144,7 @@ export default function Genfiles() { // Componente principal
     }
   }, [chips]);
 
-  useEffect(() => {
+  useEffect(() => { // Cargar los esquemas y nodos disponibles
     axios
       .get("http://127.0.0.1:5000/things_types")
       .then((response) => {
@@ -177,7 +176,7 @@ export default function Genfiles() { // Componente principal
     [globalSchemes]
   );
 
-  useEffect(() => {
+  useEffect(() => { // Cargar las propiedades del esquema seleccionado
     if (selectedScheme) {
       if (isGlobalType(selectedScheme)) {
         axios
@@ -207,7 +206,7 @@ export default function Genfiles() { // Componente principal
     }
   }, [selectedScheme, isGlobalType, userDocs]);
 
-  useEffect(() => {
+  useEffect(() => { // Cargar los chips del property seleccionado
     if (selectedScheme && selectedProperty) {
       if (isGlobalType(selectedScheme)) {
         axios
@@ -233,7 +232,7 @@ export default function Genfiles() { // Componente principal
     }
   }, [selectedScheme, selectedProperty, isGlobalType, userDocs]);
 
-  useEffect(() => {
+  useEffect(() => { // Actualizar el rango de aparición de los elementos seleccionados
     if (valueRange[1] > selectedChipsCount) {
       setRangeValue(([min]) => [min, selectedChipsCount]);
     }
@@ -245,16 +244,13 @@ export default function Genfiles() { // Componente principal
   // -------------------------------------------
   //  Handlers
   // -------------------------------------------
-  const handleChipClick = (chip: string) => {
+  const handleChipClick = (chip: string) => { // Manejar el click en un chip
     setChipsState((prev) => {
       const current = prev[chip];
       let nextState: ChipState;
       if (current === 'unselected') {
         nextState = 'selected';
-      } else if (current === 'selected') {
-        nextState = 'fixed';
       } else {
-        // current === 'fixed'
         nextState = 'unselected';
       }
       return {
@@ -264,7 +260,7 @@ export default function Genfiles() { // Componente principal
     });
   };
 
-  const handleLoadFile = () => {
+  const handleLoadFile = () => { // Cargar los archivos subidos por el usuario
     if (!filesToUpload || filesToUpload.length === 0) {
       toast.error("Debe seleccionar al menos un archivo para cargar en el frontend.");
       return;
@@ -295,7 +291,7 @@ export default function Genfiles() { // Componente principal
     });
   };
 
-  const identifyTypeFromDoc = (doc: { id?: string }): string | null => {
+  const identifyTypeFromDoc = (doc: { id?: string }): string | null => { // Identificar el tipo de un documento
     if (!doc || !doc.id) {
       return null;
     }
@@ -310,15 +306,15 @@ export default function Genfiles() { // Componente principal
   };
 
   // Ubicaciones
-  const handleAddLocationSet = () => {
+  const handleAddLocationSet = () => { // Añadir una ubicación
     setLocationSets((prev) => [...prev, { location: "", numFiles: 1 }]);
   };
 
-  const handleRemoveLocationSet = (index: number) => {
+  const handleRemoveLocationSet = (index: number) => { // Eliminar una ubicación
     setLocationSets((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleLocationChange = (index: number, value: string) => {
+  const handleLocationChange = (index: number, value: string) => { // Cambiar el nombre de una ubicación
     setLocationSets((prev) => {
       const newSets = [...prev];
       newSets[index].location = value;
@@ -326,16 +322,31 @@ export default function Genfiles() { // Componente principal
     });
   };
 
-  const handleLocationNumFilesChange = (index: number, value: number) => {
+  const handleLocationNumFilesChange = (index: number, value: number) => { // Cambiar el número de archivos de una ubicación
     setLocationSets((prev) => {
       const newSets = [...prev];
       newSets[index].numFiles = value;
       return newSets;
     });
   };
-
+  const handleDownloadZip = () => { // Descargar los archivos generados
+    axios
+      .get("http://127.0.0.1:5000/download_files", { responseType: "blob" })
+      .then((response) => {
+        const url = window.URL.createObjectURL(new Blob([response.data]));
+        const link = document.createElement("a");
+        link.href = url;
+        link.setAttribute("download", "archivos_generados.zip");
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      })
+      .catch((error) => {
+        console.error("Error downloading zip:", error);
+      });
+  };
   // Guardar selección
-  const handleSaveSelection = () => {
+  const handleSaveSelection = () => { // Guardar la selección realizada
     if (!selectedNode) {
       toast.error('El campo "Nodo" debe tener un valor');
       return;
@@ -362,121 +373,136 @@ export default function Genfiles() { // Componente principal
         return;
       }
     }
-
-    // Construimos las dos listas
+  
+    // Construimos las dos listas (chips fijados y seleccionados)
     const chipsFixed: string[] = [];
     const chipsSelected: string[] = [];
-
-    Object.entries(chipsState).forEach(([chip, state]) => {
-      if (state === 'fixed') {
-        chipsFixed.push(chip);
-      } else if (state === 'selected') {
+  
+    Object.entries(chipsState).forEach(([chip, state]) => { // Separar los chips fijados de los seleccionados
+      if (state === 'selected') {
         chipsSelected.push(chip);
       }
     });
-
+  
     const newSelection: Selection = {
       scheme: selectedScheme,
       property: selectedProperty,
       chips: [
-        ...chipsFixed.map((chip) => "!" + chip),  // forzadas con prefijo "!"
+        ...chipsFixed.map((chip) => "!" + chip),
         ...chipsSelected
       ],
       range: valueRange,
       node: selectedNode,
       locationSets: locationSets.map((loc) => ({ ...loc })),
     };
-
-    setSavedSelections((prevSelections) => {
-      const existingIndex = prevSelections.findIndex(
-        (sel) =>
-          sel.scheme === selectedScheme &&
-          sel.property === selectedProperty &&
-          sel.node === selectedNode
-      );
-      if (existingIndex !== -1) {
-        const updatedSelections = [...prevSelections];
-        updatedSelections[existingIndex] = newSelection;
-        return updatedSelections;
-      } else {
-        return [...prevSelections, newSelection];
-      }
+  
+    // --- [1] Filtramos fuera cualquier selección "igual" (mismo node+scheme+property+chips) ---
+    setSavedSelections((prevSelections) => { // Filtrar las selecciones guardadas
+      return [
+        ...prevSelections.filter((oldSel) => {
+          if (
+            oldSel.node !== newSelection.node ||
+            oldSel.scheme !== newSelection.scheme ||
+            oldSel.property !== newSelection.property
+          ) {
+            return true; // distinto node/scheme/property => se conserva
+          }
+          // Si es mismo node+scheme+property, comparamos los chips ignorando orden
+          return !sameChipSet(oldSel.chips, newSelection.chips);
+        }),
+        // --- [2] añadimos la nueva selección ---
+        newSelection
+      ];
     });
+  
+    toast.success("Selección guardada correctamente.");
   };
+  
+  function sameChipSet(a: string[], b: string[]): boolean { // Comprobar si dos conjuntos de chips son iguales
+    if (a.length !== b.length) return false;
+    const sortedA = [...a].sort();
+    const sortedB = [...b].sort();
+    return sortedA.every((val, idx) => val === sortedB[idx]);
+  }
+  
+  
 
-  const handleEditSelection = (selection: Selection) => {
-    setSelectedScheme(selection.scheme);
-    setSelectedProperty(selection.property);
-    setSelectedChips(selection.chips);
-    setRangeValue(selection.range);
-    setSelectedNode(selection.node);
-    setLocationSets(selection.locationSets);
+  const handleEditSelection = (grouped: GroupedSelection) => { // Editar una selección guardada
+    if (!grouped.subSelections.length) return; // Si no hay sub-selecciones, no hacemos nada
+    
+    const firstSub = grouped.subSelections[0];
+    // Ej. firstSub.range = "0 - 2"
+    const [minVal, maxVal] = firstSub.range.split(" - ").map(Number);
+  
+    setSelectedScheme(grouped.scheme);
+    setSelectedProperty(firstSub.property);
+    setSelectedChips(firstSub.chips);    // Si quieres verlas marcadas en el panel
+    setRangeValue([minVal, maxVal]);
+    setSelectedNode(grouped.node);
+    setLocationSets(grouped.locationSets);
   };
+  
 
-  const handleDeleteSelection = (rowData: GroupedSelection) => {
+  const handleDeleteSelection = (grouped: GroupedSelection) => { // Eliminar una selección guardada
     setSavedSelections((prevSelections) =>
       prevSelections.filter(
-        (sel) => sel.node !== rowData.node || sel.scheme !== rowData.scheme
+        (sel) =>
+          sel.node !== grouped.node ||
+          sel.scheme !== grouped.scheme
       )
     );
     toast.success("Selección eliminada.");
   };
+  
 
   // Agrupar en una sola fila por (node, scheme)
   const getGroupedSelections = useCallback((): GroupedSelection[] => {
     const groupingMap = new Map<string, GroupedSelection>();
-
+  
     savedSelections.forEach((sel) => {
       const key = `${sel.node}---${sel.scheme}`;
       const rangeStr = `${sel.range[0]} - ${sel.range[1]}`;
-
+  
       if (!groupingMap.has(key)) {
         groupingMap.set(key, {
           node: sel.node || "",
           scheme: sel.scheme || "",
-          properties: sel.property ? [sel.property] : [],
-          chips: [...sel.chips],
-          ranges: [rangeStr],
-          locationSets: sel.locationSets.map((l) => ({ ...l })),
+          subSelections: [{
+            property: sel.property || "",
+            chips: [...sel.chips],
+            range: rangeStr
+          }],
+          locationSets: [...sel.locationSets]
         });
       } else {
         const group = groupingMap.get(key)!;
-        if (sel.property && !group.properties.includes(sel.property)) {
-          group.properties.push(sel.property);
-        }
-        group.chips.push(...sel.chips);
-        group.ranges.push(rangeStr);
+        // Añadimos un "subSelection" más (aunque sea la misma property, se muestra aparte)
+        group.subSelections.push({
+          property: sel.property || "",
+          chips: [...sel.chips],
+          range: rangeStr
+        });
+        // Fusionamos locationSets
         sel.locationSets.forEach((loc) => {
-          const existing = group.locationSets.find(
-            (gLoc) => gLoc.location === loc.location
-          );
-          if (!existing) {
+          if (!group.locationSets.find((l) => l.location === loc.location)) {
             group.locationSets.push({ ...loc });
           }
         });
       }
     });
-
-    const finalArray: GroupedSelection[] = [];
-    groupingMap.forEach((value) => {
-      const chipsUnique = Array.from(new Set(value.chips));
-      const propsUnique = Array.from(new Set(value.properties));
-      finalArray.push({
-        ...value,
-        properties: propsUnique,
-        chips: chipsUnique,
-      });
-    });
-
-    return finalArray;
+  
+    // Devolvemos un array
+    return Array.from(groupingMap.values());
   }, [savedSelections]);
+  
+
 
   const groupedSelections = getGroupedSelections();
 
   // Generar / Previsualizar / Descargar
 
   // 1) Construye la estructura que <FileExplorer> necesita a partir del "resumen" real
-  function buildTreeFromResumen(resumen: ResumenItem[]): FileItem[] {
+  function buildTreeFromResumen(resumen: ResumenItem[]): FileItem[] { // Construir la estructura de previsualización de archivos
     const estructura_nodos: FileItem[] = [];
 
     for (const item of resumen) {
@@ -506,43 +532,63 @@ export default function Genfiles() { // Componente principal
     return estructura_nodos;
   }
 
-  const handleGenerateFiles = async () => {
-    const diccionario: {
-      [node: string]: {
-        [scheme: string]: {
-          atributos: {
-            [property: string]: {
-              elementosSeleccionados: string[];
-              rango: [number, number];
-            };
-          };
-          ubicaciones: LocationSet[];
-        };
-      };
-    } = {};
+  const handleGenerateFiles = async () => { 
+    /**
+     * Cada "Selection" se convertirá en un "sub-selección" para la property en cuestión.
+     * En lugar de:
+     *
+     * diccionario[node][scheme].atributos[property] = { elementosSeleccionados, rango }
+     *
+     * Hace:
+     *
+     * diccionario[node][scheme].atributos[property] = [
+     *    { elementosSeleccionados, rango },
+     *    { elementosSeleccionados, rango },
+     *    ...
+     * ]
+     */
+    const diccionario: Record<string, Record<string, { atributos: Record<string, { elementosSeleccionados: string[]; rango: [number, number]; }[]>; ubicaciones: LocationSet[]; }>> = {};
 
-    (savedSelections || []).forEach((row) => {
-      const { node, scheme, property, chips, range, locationSets } = row;
-      if (!diccionario[node!]) {
-        diccionario[node!] = {};
+    // Recorremos las selecciones guardadas
+    savedSelections.forEach((sel) => {
+      const { node, scheme, property, chips, range, locationSets } = sel;
+      if (!node || !scheme || !property) return;
+
+      if (!diccionario[node]) {
+        diccionario[node] = {};
       }
-      if (!diccionario[node!][scheme!]) {
-        diccionario[node!][scheme!] = {
+      if (!diccionario[node][scheme]) {
+        diccionario[node][scheme] = {
           atributos: {},
           ubicaciones: locationSets.map((ls) => ({
             location: ls.location,
             numFiles: ls.numFiles,
           })),
         };
+      } else {
+        // Si ya existe, nos aseguramos de fusionar las ubicaciones (si hubiera diferencias)
+        locationSets.forEach((ls) => {
+          const existLoc = diccionario[node][scheme].ubicaciones.find(
+            (u) => u.location === ls.location
+          );
+          if (!existLoc) {
+            diccionario[node][scheme].ubicaciones.push({ ...ls });
+          }
+        });
       }
-      diccionario[node!][scheme!].atributos[property!] = {
+
+      // Convertimos la property en array de sub-selecciones
+      if (!diccionario[node][scheme].atributos[property]) {
+        diccionario[node][scheme].atributos[property] = [];
+      }
+
+      diccionario[node][scheme].atributos[property].push({
         elementosSeleccionados: chips,
-        rango: range,
-      };
+        rango: range
+      });
     });
 
     try {
-      // Llamada al backend
       const res = await axios.post(
         "http://127.0.0.1:5000/prepare_files/",
         {
@@ -555,37 +601,22 @@ export default function Genfiles() { // Componente principal
           }
         }
       );
-      // Guardamos el resumen
+
       setResumen(res.data.resumen);
 
-      // Generamos la previsualización a partir de 'resumen'
+      // Creamos la previsualización de archivos a partir del resumen
       const preview = buildTreeFromResumen(res.data.resumen);
       setPreviewData(preview);
 
       toast.success("Archivos generados correctamente. ¡Puedes previsualizarlos!");
+      setGeneratedDictionary(diccionario);
+
     } catch (error) {
       console.error("Error generating files:", error);
       toast.error("Error al generar archivos en el backend.");
     }
-    setGeneratedDictionary(diccionario);
   };
 
-  const handleDownloadZip = () => {
-    axios
-      .get("http://127.0.0.1:5000/download_files", { responseType: "blob" })
-      .then((response) => {
-        const url = window.URL.createObjectURL(new Blob([response.data]));
-        const link = document.createElement("a");
-        link.href = url;
-        link.setAttribute("download", "archivos_generados.zip");
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-      })
-      .catch((error) => {
-        console.error("Error downloading zip:", error);
-      });
-  };
 
   // Con la Opción 2, NO llamamos a /preview_structure. 
   // Solo togglear la visibilidad:
@@ -602,7 +633,7 @@ export default function Genfiles() { // Componente principal
     }
   };
 
-  const handleFileOpen = (file: { name: string; node: string}) => {
+  const handleFileOpen = (file: { name: string; node: string}) => { // Abrir un archivo
     if (!file.name || !file.node) {
       toast.error("No se pudo abrir el archivo. Falta nombre o nodo.");
       return;
@@ -627,11 +658,11 @@ export default function Genfiles() { // Componente principal
       });
   };
 
-  const handleCloseModal = () => {
+  const handleCloseModal = () => { // Cerrar el modal de edición de archivo
     setIsFileModalOpen(false);
     setOpenedFileContent(null);
   };
-  const handleSliderChange = (e: SliderChangeEvent) => {
+  const handleSliderChange = (e: SliderChangeEvent) => { // Cambiar el rango de aparición de los elementos seleccionados
     let [minVal, maxVal] = e.value as [number, number];
   
     // Si se han invertido por arrastre (min>max), intercambiarlos
@@ -645,7 +676,7 @@ export default function Genfiles() { // Componente principal
   
     setRangeValue([minVal, maxVal]);
   };
-  const handleSaveFile = async () => {
+  const handleSaveFile = async () => { // Guardar el archivo editado
     if (!openedFileContent) return;
     const { node, name } = openedFileContent;
     try {
@@ -705,40 +736,23 @@ export default function Genfiles() { // Componente principal
   };
 
   // Column con botones de editar/borrar
-  const groupedActionBodyTemplate = (rowData: GroupedSelection) => {
+  const groupedActionBodyTemplate = (rowData: GroupedSelection) => { // Plantilla de la columna de acciones
     return (
       <div>
         <Button
           icon="pi pi-pencil"
           className="p-button-text p-button-sm"
-          onClick={() =>
-            handleEditSelection({
-              scheme: rowData.scheme,
-              property: rowData.properties[0],
-              chips: rowData.chips,
-              range: [0, 0],
-              node: rowData.node,
-              locationSets: rowData.locationSets,
-            })
-          }
+          onClick={() => handleEditSelection(rowData)}
         />
         <Button
           icon="pi pi-trash"
           className="p-button-text p-button-sm p-button-danger"
-          onClick={() =>
-            handleDeleteSelection({
-              scheme: rowData.scheme,
-              properties: rowData.properties,
-              chips: rowData.chips,
-              ranges: rowData.ranges,
-              node: rowData.node,
-              locationSets: rowData.locationSets,
-            })
-          }
+          onClick={() => handleDeleteSelection(rowData)}
         />
       </div>
     );
   };
+  
 
   // -------------------------------------------
   //  Render principal
@@ -842,8 +856,6 @@ export default function Genfiles() { // Componente principal
                 <p className="genfiles-rangeText">
                   Rango seleccionado: {valueRange[0]}-{valueRange[1]}
                 </p>
-                <p>Elementos fijados: </p> 
-                {chips.filter((chip) => chipsState[chip] === 'fixed').join(", ")}
               </div>
 
               <p>Ubicaciones:</p>
@@ -916,19 +928,31 @@ export default function Genfiles() { // Componente principal
               header="Atributos seleccionados"
               headerClassName="genfiles-columnHeader"
               className="genfiles-column"
-              body={(rowData: GroupedSelection) => rowData.properties.join(" | ")}
+              body={(rowData: GroupedSelection) =>
+                rowData.subSelections
+                  .map((sub) => sub.property)
+                  .join(" | ")
+              }
             />
             <Column
               header="Elementos"
               headerClassName="genfiles-columnHeader"
               className="genfiles-column"
-              body={(rowData: GroupedSelection) => rowData.chips.join(", ")}
+              body={(rowData: GroupedSelection) =>
+                rowData.subSelections
+                  .map((sub) => sub.chips.join(", "))
+                  .join(" | ")
+              }
             />
             <Column
               header="Rango"
               headerClassName="genfiles-columnHeader"
               className="genfiles-columnRange"
-              body={(rowData: GroupedSelection) => rowData.ranges.join(" | ")}
+              body={(rowData: GroupedSelection) =>
+                rowData.subSelections
+                  .map((sub) => sub.range)
+                  .join(" | ")
+              }
             />
             <Column
               header="Ubicaciones"
@@ -990,13 +1014,7 @@ export default function Genfiles() { // Componente principal
                       Se han generado para el nodo &#39;{info.nodo}&#39;:{" "}
                       {info.numero_archivos} archivos de tipo &#39;{info.tipo}&#39;.
                     </p>
-                    {info.atributos_modificados.map((attr, i) => (
-                      <p key={i}>
-                        Atributo &#39;{attr.atributo}&#39; con elementos{" "}
-                        {JSON.stringify(attr.elementos)} y rango{" "}
-                        {JSON.stringify(attr.rango)}.
-                      </p>
-                    ))}
+                    
                     {info.combinaciones_atributos &&
                       Object.entries(info.combinaciones_atributos).map(
                         ([atributo, combos]) => (
@@ -1019,10 +1037,10 @@ export default function Genfiles() { // Componente principal
                       <div key={j} className="genfiles-blockMargin">
                         <p>Archivo {archivo.archivo}:</p>
                         {archivo.atributos.map((attr, k) =>
-                          attr.propiedades_seleccionadas.length >= 0 ? (
+                          attr.propiedades_incluidas.length >= 0 ? (
                             <p key={k}>
                               Atributo &#39;{attr.atributo}&#39; con propiedades:{" "}
-                              {attr.propiedades_seleccionadas.join(", ")}
+                              {attr.propiedades_incluidas.join(", ")}
                             </p>
                           ) : (
                             <p key={k}>

@@ -113,6 +113,12 @@ export default function Genfile() {
   }, [selectedProperty]);
 
   /* ------------------- Handlers ------------------- */
+
+  /**
+   * Maneja la selección de un chip determinado.
+   * - Agrega o quita el chip de la lista de chips seleccionados.
+   * - Actualiza el rango con base en la cantidad de chips seleccionados.
+   */
   const handleChipClick = (chip: string) => {
     setSelectedChips((prevSelectedChips) => {
       const newSelectedChips = prevSelectedChips.includes(chip)
@@ -122,7 +128,11 @@ export default function Genfile() {
       return newSelectedChips;
     });
   };
-
+  
+  /**
+   * Envía una solicitud al backend para generar un nuevo archivo JSON de ejemplo
+   * basado en el esquema seleccionado. El archivo resultante se muestra en el editor.
+   */
   const handleGenerateFile = async () => {
     if (!selectedScheme) {
       toast.error('Debe seleccionar un tipo de esquema');
@@ -141,6 +151,13 @@ export default function Genfile() {
     }
   };
 
+  /**
+   * Lógica para cargar un archivo JSON desde el disco local.
+   * - Lee el contenido y lo convierte a JSON.
+   * - Intenta identificar el tipo en el backend (identify_type).
+   *   - Si el backend reconoce el tipo, se setea dicho tipo en el estado.
+   *   - Si no lo reconoce, se intenta inferir un tipo local usando 'inferLocalTypeFromDocId'.
+   */
   const handleLoadFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -201,6 +218,13 @@ export default function Genfile() {
     toast.info(`Tipo inferido localmente: ${newType}`);
   };
 
+  /**
+   * Envía la solicitud al backend para modificar el archivo JSON según:
+   * - La propiedad seleccionada
+   * - Los chips seleccionados
+   * - El rango seleccionado
+   * El backend devolverá el archivo modificado, que se mostrará en el editor.
+   */
   const handleModify = async () => {
     if (!displayedFileContent) {
       toast.error('No hay contenido para modificar');
