@@ -33,7 +33,7 @@ La aplicación tiene 3 páginas divididas por su funcionalidad:
 ![Pagina principal](imgs/Screenshot%202025-01-31%20111002.png)
 En la página principal se muestran las dos opciones principales de la aplicación. Haciendo click en una de ellas, se accede a las funcionalidades de generar un solo archivo o varios por separado.
 ### Generar un archivo
-![[Pasted image 20250129184457.png]]
+![[Generar un solo archivo](imgs/Screenshot%202025-01-31%20110447.png)]
 En generar un solo archivo, como su nombre indica, se lleva a cabo la creación de un archivo en base al tipo elegido y éste puede ser editado de dos maneras: haciendo uso de las opciones del panel izquierdo o escribiendo directamente en el archivo. Paso a paso:
 
 #### 1. Elegir el tipo de dispositivo (“Esquema”) a generar
@@ -143,7 +143,7 @@ La aplicación se divide, por tanto, en **dos pantallas** principales según la 
 ---
 
 #### 2. Generar Nodos Personalizados
-![[Pasted image 20250131112309.png]]
+![Generar nodos personalizados](imgs/Screenshot%202025-01-31%20112308.png)
 
 1. **Elegir número de nodos a generar**  
     Verás una casilla donde puedes escribir un número, por ejemplo “1”, “2”, “3”...
@@ -164,7 +164,7 @@ La aplicación se divide, por tanto, en **dos pantallas** principales según la 
 ---
 
 #### 3. Generar Archivos Aleatorios
-![[Pasted image 20250131112358.png]]
+![Generar archivos aleatorios](imgs/Screenshot%202025-01-31%20112356.png)
 
 Esta es la parte más extensa y con más opciones. Al seleccionar la opción “Generar Archivos Aleatorios”, verás varios bloques:
 
@@ -221,7 +221,7 @@ Después de configurar la ubicación y tipos para cada nodo, verás varios boton
 ---
 
 ##### 3.4. Abrir y editar un archivo (desde la Previsualización)
-![[Pasted image 20250131113951.png]]
+![Previsualizacion](imgs/Screenshot%202025-01-31%20113949.png)
 
 Cuando hagas clic en un archivo desde el árbol (por ejemplo, `acg_home_light165.json`):
 1. **Se abrirá una ventana (modal) de edición**
@@ -253,7 +253,7 @@ Cuando hagas clic en un archivo desde el árbol (por ejemplo, `acg_home_light165
 - **La ubicación** que escribas en cada nodo (p. ej. “universidad”) se reflejará en los archivos JSON como parte de la descripción (“Device located in universidad”).
 
 ### Generar varios archivos
-![[Pasted image 20250131114308.png]]
+![Generar varios archivos](imgs/Screenshot%202025-01-31%20114255.png)
 
 #### 1. Pantalla principal
 Al entrar a esta sección, verás en la **columna izquierda** varios campos y botones que te permitirán:
