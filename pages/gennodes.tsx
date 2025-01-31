@@ -100,7 +100,6 @@ const GenerateRandomFiles = () => { // Componente principal
   const [isFileModalOpen, setIsFileModalOpen] = useState(false); // Estado para abrir/cerrar el modal de archivo
   const [openedFileContent, setOpenedFileContent] = useState<{ // Estado para el contenido del archivo abierto
     node: string;
-    tipo: string;
     name: string;
     content: unknown;
   } | null>(null);
@@ -389,27 +388,55 @@ const GenerateRandomFiles = () => { // Componente principal
   /* -------------------------------------------------------------------------
      COMPONENTE EXPLORADOR DE ARCHIVOS (recursivo simple)
   ------------------------------------------------------------------------- */
-  const FileExplorer = ({ // Componente para explorar archivos
+  const FileExplorer = ({
     estructura,
     onFileSelect
   }: {
     estructura: FileItem[];
     onFileSelect: (file: FileItem) => void;
   }) => {
-    const renderNodes = (nodes: FileItem[]) => {
-      return nodes.map((node, idx) => {
-        if (node.type === 'folder' && node.children) {
+    // Estado que guarda si un nodo (carpeta) está abierto: { "nodo/tipo": true/false, ... }
+    const [openStates, setOpenStates] = useState<Record<string, boolean>>({});
+  
+    // Función para alternar (abrir/cerrar) un nodo
+    const toggleNode = (path: string) => {
+      setOpenStates((prev) => ({
+        ...prev,
+        [path]: !prev[path]
+      }));
+    };
+  
+    // Render recursivo, recibiendo la "ruta padre" para construir una key única
+    const renderNodes = (nodes: FileItem[], parentPath = "") => {
+      return nodes.map((node) => {
+        // Construimos un path único concatenando parentPath + nombre
+        const currentPath = parentPath ? `${parentPath}/${node.name}` : node.name;
+  
+        if (node.type === "folder" && node.children) {
+          const isOpen = !!openStates[currentPath];
+  
+          const handleSummaryClick = (e: React.MouseEvent) => {
+            e.preventDefault(); // Evita que <details> abra/cierre por defecto
+            toggleNode(currentPath); // Lo hacemos nosotros a mano
+          };
+  
           return (
-            <details key={idx} style={{ marginLeft: '1rem' }}>
-              <summary>{node.name}</summary>
-              {renderNodes(node.children)}
-            </details>
+            <div key={currentPath} style={{ marginLeft: "1rem" }}>
+              <details open={isOpen}>
+                <summary onClick={handleSummaryClick}>{node.name}</summary>
+                {isOpen && (
+                  <div>
+                    {renderNodes(node.children, currentPath)}
+                  </div>
+                )}
+              </details>
+            </div>
           );
         } else {
-          // Es un 'file'
+          // Es un archivo
           return (
             <p
-              key={idx}
+              key={currentPath}
               style={{ cursor: 'pointer', marginLeft: '2rem', color: '#8ff' }}
               onClick={() => onFileSelect(node)}
             >
@@ -419,9 +446,10 @@ const GenerateRandomFiles = () => { // Componente principal
         }
       });
     };
-
+  
     return <div>{renderNodes(estructura)}</div>;
   };
+  
 
   /* -------------------------------------------------------------------------
      ABRIR ARCHIVO
@@ -440,7 +468,6 @@ const GenerateRandomFiles = () => { // Componente principal
       
       setOpenedFileContent({
         node: file.node,
-        tipo: file.tipo,
         name: file.name,
         content: res.data,
       });
@@ -457,13 +484,11 @@ const GenerateRandomFiles = () => { // Componente principal
   ------------------------------------------------------------------------- */
   const handleSaveFile = async () => { // Función para guardar un archivo
     if (!openedFileContent) return;
-    const { node, tipo, name } = openedFileContent;
+    const { node, name } = openedFileContent;
     try {
       const parsed = JSON.parse(editedFileContent);
       await axios.post(
-        `http://127.0.0.1:5000/save_file/${encodeURIComponent(node)}/${encodeURIComponent(
-          tipo
-        )}/${encodeURIComponent(name)}`,
+        `http://127.0.0.1:5000/save_file/${encodeURIComponent(node)}/${encodeURIComponent(name)}`,
         { content: parsed },
         { headers: { "Content-Type": "application/json" } }
       );
@@ -475,7 +500,7 @@ const GenerateRandomFiles = () => { // Componente principal
     }
   };
 
-  const handleCloseModal = () => {
+  const handleCloseModal = () => { // Función para cerrar el editor de archivo
     setIsFileModalOpen(false);
     setOpenedFileContent(null);
     setEditedFileContent("");
@@ -678,7 +703,7 @@ const GenerateRandomFiles = () => { // Componente principal
           >
             <button
               onClick={handleCloseModal}
-              className="absolute top-2 right-2 text-[#f1f1f1] text-lg"
+              className="p-button-modal-close"
             >
               &times;
             </button>
@@ -700,13 +725,13 @@ const GenerateRandomFiles = () => { // Componente principal
             <div className="mt-4 flex justify-end gap-2">
               <button
                 onClick={handleSaveFile}
-                className="bg-[#43AE6A] text-[#f1f1f1] px-4 py-2 rounded"
+                className="p-button-modal-save"
               >
                 Guardar Cambios
               </button>
               <button
                 onClick={handleCloseModal}
-                className="bg-[#D7483E] text-white px-4 py-2 rounded"
+                className="p-button-modal-cancel"
               >
                 Cancelar
               </button>

@@ -98,6 +98,67 @@ const montserrat = Montserrat({ // Fuente utilizada en la aplicación (probablem
   weight: ['400', '700'],
 });
 
+interface FileItem {
+  name: string;
+  children?: FileItem[];
+  node?: string;
+}
+
+interface FileExplorerProps {
+  estructura: FileItem[];
+  onFileSelect: (file: { name: string; node: string }) => void;
+}
+
+export function FileExplorer({ estructura, onFileSelect }: FileExplorerProps) {
+  const [openStates, setOpenStates] = React.useState<Record<string, boolean>>({});
+
+  // Función para alternar (abrir/cerrar) el estado de un "nodo" concreto
+  const toggleNode = React.useCallback((path: string) => {
+    setOpenStates((prev) => ({ ...prev, [path]: !prev[path] }));
+  }, []);
+
+  // Render recursivo con indentación
+  const renderNodes = (nodes: FileItem[], parentPath: string, level: number = 0) => {
+    return nodes.map((node) => {
+      // Construimos una clave única para cada <details>
+      const currentPath = parentPath ? `${parentPath}/${node.name}` : node.name;
+
+      // La indentación la hacemos con margen a la izquierda según el nivel
+      const styleIndent = { marginLeft: `${level * 1.5}rem` };
+
+      // onClick de la <summary>:
+      //  - Si tiene hijos (carpeta), togglear openStates
+      //  - Si no tiene hijos (archivo), llamar a onFileSelect
+      const handleSummaryClick = (e: React.MouseEvent) => {
+        e.preventDefault();
+        if (node.children && node.children.length > 0) {
+          toggleNode(currentPath);
+        } else {
+          onFileSelect({
+            name: node.name,
+            node: node.node ?? "root",
+          });
+        }
+      };
+
+      return (
+        <div key={currentPath} style={styleIndent}>
+          <details open={!!openStates[currentPath]}>
+            <summary onClick={handleSummaryClick}>{node.name}</summary>
+            {node.children && openStates[currentPath] && (
+              <div>
+                {renderNodes(node.children, currentPath, level + 1)}
+              </div>
+            )}
+          </details>
+        </div>
+      );
+    });
+  };
+
+  return <div>{renderNodes(estructura, "", 0)}</div>;
+}
+
 export default function Genfiles() { // Componente principal
   const [filesToUpload, setFilesToUpload] = useState<FileList | null>(null); // Archivos subidos por el usuario
   const [userDocs, setUserDocs] = useState<UserDoc[]>([]); // Documentos subidos por el usuario
@@ -697,43 +758,7 @@ export default function Genfiles() { // Componente principal
     }
   };
 
-  // Componente de exploración de archivos
-  const FileExplorer = ({
-    estructura,
-    onFileSelect,
-  }: {
-    estructura: FileItem[];
-    onFileSelect: (file: { name: string; node: string}) => void;
-  }) => {
-    const renderNodes = (
-      nodes: FileItem[],
-      
-    ) => {
-      return nodes.map((node, index) => (
-        <div key={index}>
-          <details>
-            <summary
-              onClick={() => {
-                // Si NO tiene children, es archivo
-                if (!node.children) {
-                  onFileSelect({
-                    name: node.name,
-                    node: node.node ?? "root",
-                  });
-                }
-              }}
-            >
-              {node.name}
-            </summary>
-            {node.children &&
-              renderNodes(node.children)}
-          </details>
-        </div>
-      ));
-    };
-
-    return <div>{renderNodes(estructura)}</div>;
-  };
+  
 
   // Column con botones de editar/borrar
   const groupedActionBodyTemplate = (rowData: GroupedSelection) => { // Plantilla de la columna de acciones
