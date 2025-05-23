@@ -33,7 +33,7 @@ The application has 3 pages divided by functionality:
 ![Main page](imgs/Screenshot%202025-01-31%20111002.png)
 The main page shows the two main options of the application. By clicking on one of them, you can access the functionalities to generate a single file or several files separately.
 ### Generate a file
-![[Generate a single file](imgs/Screenshot%202025-01-31%20110447.png)]
+![Generate a single file](imgs/Screenshot%202025-01-31%20110447.png)
 In generate single file, as the name suggests, the creation of a file is performed based on the chosen type and this can be edited in two ways: by using the options in the left panel or by writing directly to the file. Step by step:
 
 #### 1. Choose the type of device (“Scheme”) to be generated.
@@ -52,7 +52,7 @@ In generate single file, as the name suggests, the creation of a file is perform
 #### 3. Upload a file of your own (optional)
 If you already have a file saved on your computer with a device description and you want to modify or revise it:
 
-1. click on the **“Choose file ‘** (or ’Upload file”) button.
+1. click on the **"Choose file"** (or "Upload file") button.
 2. Select your JSON file from your computer.
 3. The application will display it in the editor (on the right) and, if it can identify what type of device it is, it will update the selection menu with that type.
     - If it does not recognize it, it will try to “guess” the type and warn you.
@@ -89,7 +89,7 @@ If you already have a file saved on your computer with a device description and 
 In the right pane, the final content of the file in JSON format is displayed in real time. In general, in the final file you can see:
 
 - **"id ”** of the device (identifier).
-- description “** (a short description).
+- **“description”** (a short description).
 - Sections like **"properties ‘** or **’actions ”**, where the details you selected appear.
 
 If you want to change something manually, you can type it directly in the editor.
@@ -99,14 +99,14 @@ If you want to change something manually, you can type it directly in the editor
 #### 8. Save the file
 Once you are satisfied:
 
-1. Click the **"Save ”** button.
-2. The system will download to your computer a file named, for example, **"modified_file.json ”** with all the changes made.
+1. Click the **"Save"** button.
+2. The system will download to your computer a file named, for example, **"modified_file.json"** with all the changes made.
 
 ---
 
 #### 9. Home page
 
-If you want to **go back to the start** of the application or change sections, click on **"Home Page ”** to return to the initial screen.
+If you want to **go back to the start** of the application or change sections, click on **"Home Page"** to return to the initial screen.
 
 
 ---
@@ -119,9 +119,9 @@ If you want to **go back to the start** of the application or change sections, c
 4. Choose in the second menu the **properties** or the section you want to modify (properties, actions, etc.).
 5. **Select the properties** (chips) you are interested in.
 6. Adjust the **range** with the slider (how many of those properties will be included).
-7. Click **"Modify ”** to apply the changes.
+7. Click **"Modify"** to apply the changes.
 8. Review the file in the **editor** on the right.
-9. Click **"Save ”** to download the file with your changes.
+9. Click **"Save"** to download the file with your changes.
 10. Press **"Home page ”** to return to the top.
 ### Generate nodes
 #### 1. Main screen: “Generate Files”.
@@ -135,7 +135,7 @@ Select the one you need depending on what you want to do:
 - **Option 1:** “Generate Custom Nodes”.  
     This section is used to create a specific number of nodes to then go to Generate Multiple Files (page we will see later).
     
-- Option 2:** “Generate Random Files”.  
+- **Option 2:** “Generate Random Files”.  
     Here you will be able to configure, for each node, certain device “types” and how many files (JSON) will be randomly generated with those types.
     
 
@@ -159,7 +159,7 @@ The application is therefore divided into **two main screens** depending on the 
     - Below the “Generate Nodes” button there is another button called “Home Page”.
     - It takes you back to the home screen of the application in case you want to change mode or exit.
 
-**What happens next?
+**What happens next?**
 - Once the nodes are generated, the application sends you to “Generate multiple files”.
 
 ---
@@ -170,8 +170,8 @@ The application is therefore divided into **two main screens** depending on the 
 This is the most extensive part with the most options. When you select the “Generate Random Files” option, you will see several blocks:
 
 ##### 3.1. Generate Nodes.
-- Number of nodes**: Here you choose how many nodes you want to create (for example, “1”).
-- Generate Nodes” button**: Creates in the background the necessary folders and ‘nodes’ on the server.
+- **Number of nodes**: Here you choose how many nodes you want to create (for example, “1”).
+- **"Generate Nodes" button**: Creates in the background the necessary folders and ‘nodes’ on the server.
 - **Upload JSON files (custom TDs)**:
     - If you have JSON files on your computer (e.g. device descriptions that you created yourself), you can upload them here so that the system takes them into account when creating the files.
     - After uploading one or more files, the application will confirm if they have been uploaded correctly.
@@ -187,11 +187,11 @@ Within each **node**:
 1. **Location**.
     - You can type a word such as “university”, “home”, “office”, etc.
     - It serves to specify where the devices generated by this node will be virtually located.
-2. **"Add Type ”** button
+2. **"Add Type"** button
     - Each node can have several **device types**. For example, “Light bulb”, “Door”, “Temperature sensor”, etc.
     - When you click “Add Type”, a new row will appear where you configure:
         - **Type** (selected from a drop-down menu that includes both “Global” types and the “Custom” ones you uploaded from your JSON files).
-        - NumFiles**: The number of JSON files you want to generate for that particular type.
+        - **NumFiles**: The number of JSON files you want to generate for that particular type.
 3. **Delete a Type**.
     - If you add a type and you make a mistake, you have a little “trash” (or “x”) button to remove it.
 
@@ -237,20 +237,20 @@ When you click on a file from the tree (for example, `acg_home_light165.json`):
 ---
 
 #### Summary of most common uses
-1. **Generate one or more “nodes ”**.
+1. **Generate one or more “nodes”**.
 2. In each node, indicate its **location** and the **types** of device you want to generate.
 3. For each type, put how many JSON files are going to be automatically created.
 (Optional) **Upload your own JSON files** before, so that the system uses them as templates or references (“Custom: ...”).
-5. Click on **"Generate Files ”** and see on the right side the **summary** of what has been generated.
+5. Click on **"Generate Files”** and see on the right side the **summary** of what has been generated.
 6. Download the **ZIP** with all the files.
-    - Or, if you prefer, click on **"Preview Structure ”** to browse and open them individually.
+    - Or, if you prefer, click on **"Preview Structure”** to browse and open them individually.
 7. If you decide to **open and edit** a specific file, a window will be displayed to modify its contents and **save** it.
-8. Finally, you can return to the **"Home Page**.
+8. Finally, you can return to the **"Home Page"**.
 
 ---
 
 #### 5. Final considerations
-- If you do not see the files** in the preview or in the ZIP, check that you have clicked **"Generate Files ”** and have not received errors.
+- If you do not see the files** in the preview or in the ZIP, check that you have clicked **"Generate Files”** and have not received errors.
 - **The location** you type in each node (e.g. “university”) will be reflected in the JSON files as part of the description (“Device located in university”).
 
 ### Generate multiple files
@@ -269,9 +269,9 @@ In the **right column**, you will see a summary box where your selections will b
 
 ---
 #### 2. Load custom JSON files (optional)
-1. At the top left, you will find the **“Choose files ‘** (or ’Load JSON files”) button.
+1. At the top left, you will find the **"Choose files"** (or "Load JSON files") button.
 2. Select one or several files with extension `.json` from your computer.
-3. Press the **"Upload file ”** button.
+3. Press the **"Upload file"** button.
     - You will see a success notification if they have been successfully uploaded.
     - This is for the application to recognize “custom” device types that are not included in its “global” catalog.
 
@@ -307,10 +307,10 @@ Just below, the application will show some “chips” (small labels with names 
 
 ---
 #### 7. File locations and number of files
-Below the chips, you will see a section for **"Locations ”**. There you can:
+Below the chips, you will see a section for **"Locations"**. There you can:
 1. Type in a location name (e.g. “university”).
 2. Specify the number of files to be generated for that location (e.g. “10”).
-3. Click **"Add location ”** if you want more than one location (each with its own number of files).
+3. Click **"Add location”** if you want more than one location (each with its own number of files).
 4. If you make a mistake, you can delete a location with the trash can button.
 
 ---
@@ -318,10 +318,10 @@ Below the chips, you will see a section for **"Locations ”**. There you can:
 When you are satisfied with:
 
 - **Node** you chose.
-- Type** of schema.
-- Property** (actions/properties) and the **chips** checked.
-- Range** (0-3, 1-2, etc.).
-- Locations** and the number of files per location...
+- **Type** of schema.
+- **Property** (actions/properties) and the **chips** checked.
+- **Range** (0-3, 1-2, etc.).
+- **Locations** and the number of files per location...
 
 Press the **"Save Selection ”** button for the application to remember it.
 
@@ -334,7 +334,7 @@ You can repeat these steps to create **different selections** in the same node o
 ---
 #### 9. Generate Files
 When you have all the selections you want in the table, use the final buttons:
-1. **Generate Files
+1. **Generate Files**
     - Send the configuration to the server, which will create all the corresponding JSON files according to your ranges and locations.
     - A **Summary** will appear (on the right) indicating how many files have been created for each node, what properties have been included, etc.
 2. **Download ZIP**
@@ -352,11 +352,11 @@ If you click on one of the files in the preview (e.g. `acg_home_light80`):
 1. A **modal** will open where you see the JSON content.
 2. You can **edit** it manually (changing values, adding sections, etc.).
 3. Press **"Save Changes ”** to send the update to the server (the system will warn if it was saved correctly).
-4. Or click **"Cancel ”** to close without saving.
+4. Or click **"Cancel"** to close without saving.
 
 ---
 #### 11. Final recommendations
-- If something does not appear in the summary, make sure you have clicked **“Save Selection ‘** before ’Generate Files”.
+- If something does not appear in the summary, make sure you have clicked **"Save Selection"** before ’Generate Files”.
 - Verify that for each location you have specified a number of files greater than **0**.
 - The range slider “0-3” (for example) indicates that the system will randomly choose between 0 and 3 of the selected chips for each file.
 - You can make as many selections as you want for the same node or for multiple nodes, with the same or different location.
